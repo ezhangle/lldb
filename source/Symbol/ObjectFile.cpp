@@ -479,6 +479,9 @@ ObjectFile::ReadSectionData (const Section *section, off_t section_offset, void 
         {
             Error error;
             const addr_t base_load_addr = section->GetLoadBaseAddress (&process_sp->GetTarget());
+            Log *log(lldb_private::GetLogIfAllCategoriesSet (LIBLLDB_LOG_JIT_LOADER));
+            if (log)
+                log->Printf("base_load_addr: %x\nsection_offset: %x \ndst: %x\ndst_len: %x\n",base_load_addr,section_offset,dst,dst_len);
             if (base_load_addr != LLDB_INVALID_ADDRESS)
                 return process_sp->ReadMemory (base_load_addr + section_offset, dst, dst_len, error);
         }

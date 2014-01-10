@@ -445,11 +445,11 @@ protected:
                                            const DWARFDebugInfoEntry* die);
 
     uint32_t                FindTypes(std::vector<dw_offset_t> die_offsets, uint32_t max_matches, lldb_private::TypeList& types);
-
+public:
     void                    Index();
-    
-    void                    DumpIndexes();
 
+    void                    DumpIndexes();
+protected:
     void                    SetDebugMapModule (const lldb::ModuleSP &module_sp)
                             {
                                 m_debug_map_module_wp = module_sp;

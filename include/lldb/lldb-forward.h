@@ -106,6 +106,7 @@ class   InputReader;
 class   Instruction;
 class   InstructionList;
 class   IRExecutionUnit;
+class   JITLoader;
 class   LanguageRuntime;
 class   SystemRuntime;
 class   LineTable;

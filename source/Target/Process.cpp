@@ -28,6 +28,7 @@
 #include "lldb/Host/Host.h"
 #include "lldb/Target/ABI.h"
 #include "lldb/Target/DynamicLoader.h"
+#include "lldb/Target/JITLoader.h"
 #include "lldb/Target/OperatingSystem.h"
 #include "lldb/Target/LanguageRuntime.h"
 #include "lldb/Target/CPPLanguageRuntime.h"
@@ -1033,6 +1034,7 @@ Process::Process(Target &target, Listener &listener) :
     m_image_tokens (),
     m_listener (listener),
     m_breakpoint_site_list (),
+    m_did_load_jit_aps(false),
     m_dynamic_checkers_ap (),
     m_unix_signals (),
     m_abi_sp (),
@@ -1152,6 +1154,8 @@ Process::Finalize()
     m_os_ap.reset();
     m_system_runtime_ap.reset();
     m_dyld_ap.reset();
+    m_jit_aps.clear();
+    m_did_load_jit_aps = false;
     m_thread_list_real.Destroy();
     m_thread_list.Destroy();
     m_extended_thread_list.Destroy();
@@ -2914,13 +2918,14 @@ Process::DeallocateMemory (addr_t ptr)
 
 ModuleSP
 Process::ReadModuleFromMemory (const FileSpec& file_spec, 
-                               lldb::addr_t header_addr)
+                               lldb::addr_t header_addr,
+                               size_t size_to_read)
 {
     ModuleSP module_sp (new Module (file_spec, ArchSpec()));
     if (module_sp)
     {
         Error error;
-        ObjectFile *objfile = module_sp->GetMemoryObjectFile (shared_from_this(), header_addr, error);
+        ObjectFile *objfile = module_sp->GetMemoryObjectFile (shared_from_this(), header_addr, error, size_to_read);
         if (objfile)
             return module_sp;
     }
@@ -2973,6 +2978,8 @@ Process::Launch (ProcessLaunchInfo &launch_info)
     Error error;
     m_abi_sp.reset();
     m_dyld_ap.reset();
+    m_jit_aps.clear();
+    m_did_load_jit_aps = false;
     m_system_runtime_ap.reset();
     m_os_ap.reset();
     m_process_input_reader.reset();
@@ -3049,6 +3056,10 @@ Process::Launch (ProcessLaunchInfo &launch_info)
                         if (dyld)
                             dyld->DidLaunch();
 
+                        JITLoaderList &jits = GetJITLoaders ();
+                        for (JITLoaderList::iterator it = jits.begin(); it != jits.end(); ++it)
+                            (*it)->DidLaunch();
+
                         SystemRuntime *system_runtime = GetSystemRuntime ();
                         if (system_runtime)
                             system_runtime->DidLaunch();
@@ -3095,6 +3106,10 @@ Process::LoadCore ()
         DynamicLoader *dyld = GetDynamicLoader ();
         if (dyld)
             dyld->DidAttach();
+
+        JITLoaderList &jits = GetJITLoaders ();
+        for (JITLoaderList::iterator it = jits.begin(); it != jits.end(); ++it)
+            (*it)->DidAttach();
         
         SystemRuntime *system_runtime = GetSystemRuntime ();
         if (system_runtime)
@@ -3118,6 +3133,16 @@ Process::GetDynamicLoader ()
     return m_dyld_ap.get();
 }
 
+std::vector<std::unique_ptr<JITLoader>> &
+Process::GetJITLoaders ()
+{
+    if (!m_did_load_jit_aps) {
+        JITLoader::LoadPlugins(this,m_jit_aps);
+        m_did_load_jit_aps = true;
+    }
+    return m_jit_aps;
+
+}
 SystemRuntime *
 Process::GetSystemRuntime ()
 {
@@ -3188,6 +3213,8 @@ Process::Attach (ProcessAttachInfo &attach_info)
     m_abi_sp.reset();
     m_process_input_reader.reset();
     m_dyld_ap.reset();
+    m_jit_aps.clear();
+    m_did_load_jit_aps = false;
     m_system_runtime_ap.reset();
     m_os_ap.reset();
     
@@ -3360,6 +3387,10 @@ Process::CompleteAttach ()
     DynamicLoader *dyld = GetDynamicLoader ();
     if (dyld)
         dyld->DidAttach();
+
+    JITLoaderList &jits = GetJITLoaders ();
+    for (JITLoaderList::iterator it = jits.begin(); it != jits.end(); ++it)
+        (*it)->DidAttach();
 
     SystemRuntime *system_runtime = GetSystemRuntime ();
     if (system_runtime)
@@ -5756,6 +5787,8 @@ Process::DidExec ()
     m_system_runtime_ap.reset();
     m_os_ap.reset();
     m_dyld_ap.reset();
+    m_jit_aps.clear();
+    m_did_load_jit_aps = false;
     m_image_tokens.clear();
     m_allocated_memory_cache.Clear();
     m_language_runtimes.clear();

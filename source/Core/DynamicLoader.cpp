@@ -47,7 +47,7 @@ DynamicLoader::FindPlugin (Process *process, const char *plugin_name)
 // DynamicLoader constructor
 //----------------------------------------------------------------------
 DynamicLoader::DynamicLoader(Process *process) :
-    m_process (process)
+    CodeLoader (process)
 {
 }
 
@@ -57,20 +57,3 @@ DynamicLoader::DynamicLoader(Process *process) :
 DynamicLoader::~DynamicLoader()
 {
 }
-
-//----------------------------------------------------------------------
-// Accessosors to the global setting as to whether to stop at image
-// (shared library) loading/unloading.
-//----------------------------------------------------------------------
-bool
-DynamicLoader::GetStopWhenImagesChange () const
-{
-    return m_process->GetStopOnSharedLibraryEvents();
-}
-
-void
-DynamicLoader::SetStopWhenImagesChange (bool stop)
-{
-    m_process->SetStopOnSharedLibraryEvents (stop);
-}
-

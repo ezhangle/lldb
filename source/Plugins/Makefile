@@ -21,7 +21,8 @@ DIRS := ABI/MacOSX-arm ABI/MacOSX-i386 ABI/SysV-x86_64 Disassembler/llvm \
 	LanguageRuntime/ObjC/AppleObjCRuntime \
 	DynamicLoader/POSIX-DYLD \
 	OperatingSystem/Python \
-	SymbolVendor/ELF
+	SymbolVendor/ELF \
+	JITLoader/GDBJIT
 
 ifeq ($(HOST_OS),Darwin)
 DIRS += Process/MacOSX-Kernel
@@ -30,6 +31,7 @@ DIRS +=	ObjectContainer/Universal-Mach-O ObjectFile/Mach-O
 DIRS += SymbolVendor/MacOSX
 #DIRS += Process/MacOSX-User
 DIRS += Process/mach-core
+DIRS += SystemRuntime/MacOSX
 endif
 
 ifeq ($(HOST_OS),Linux)

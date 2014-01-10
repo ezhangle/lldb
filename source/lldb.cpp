@@ -22,6 +22,7 @@
 #include "lldb/Target/Target.h"
 #include "lldb/Target/Thread.h"
 
+#include "llvm/Support/TargetSelect.h"
 #include "llvm/ADT/StringRef.h"
 
 #include "Plugins/ABI/MacOSX-i386/ABIMacOSX_i386.h"
@@ -81,6 +82,7 @@
 #include "Plugins/Platform/gdb-server/PlatformRemoteGDBServer.h"
 #include "Plugins/Process/gdb-remote/ProcessGDBRemote.h"
 #include "Plugins/DynamicLoader/Static/DynamicLoaderStatic.h"
+#include "Plugins/JITLoader/GDBJIT/JITLoaderGDB.h"
 
 using namespace lldb;
 using namespace lldb_private;
@@ -99,6 +101,8 @@ lldb_private::Initialize ()
         Log::Initialize();
         Timer::Initialize ();
         Timer scoped_timer (__PRETTY_FUNCTION__, __PRETTY_FUNCTION__);
+
+        llvm::InitializeNativeTarget();
         
         ABIMacOSX_i386::Initialize();
         ABIMacOSX_arm::Initialize();
@@ -161,6 +165,7 @@ lldb_private::Initialize ()
         PlatformRemoteGDBServer::Initialize ();
         ProcessGDBRemote::Initialize();
         DynamicLoaderStatic::Initialize();
+        JITLoaderGDB::Initialize();
 
         // Scan for any system or user LLDB plug-ins
         PluginManager::Initialize();
@@ -240,6 +245,7 @@ lldb_private::Terminate ()
 #endif
     ProcessGDBRemote::Terminate();
     DynamicLoaderStatic::Terminate();
+    JITLoaderGDB::Terminate();
 
     Log::Terminate();
 }
