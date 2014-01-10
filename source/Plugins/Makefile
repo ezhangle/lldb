@@ -22,7 +22,7 @@ DIRS := ABI/MacOSX-arm ABI/MacOSX-i386 ABI/SysV-x86_64 Disassembler/llvm \
 	DynamicLoader/POSIX-DYLD \
 	OperatingSystem/Python \
 	SymbolVendor/ELF \
-	JITLoader/GDBJIT
+	JITLoader/GDB
 
 ifeq ($(HOST_OS),Darwin)
 DIRS += Process/MacOSX-Kernel

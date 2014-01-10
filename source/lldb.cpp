@@ -82,7 +82,7 @@
 #include "Plugins/Platform/gdb-server/PlatformRemoteGDBServer.h"
 #include "Plugins/Process/gdb-remote/ProcessGDBRemote.h"
 #include "Plugins/DynamicLoader/Static/DynamicLoaderStatic.h"
-#include "Plugins/JITLoader/GDBJIT/JITLoaderGDB.h"
+#include "Plugins/JITLoader/GDB/JITLoaderGDB.h"
 
 using namespace lldb;
 using namespace lldb_private;
