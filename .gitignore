@@ -3,4 +3,10 @@ build/
 llvm-build/
 *xcuserdata
 test/20*
-source/LLDBWrapPython.cpp
+source/Interpreter/LLDBWrapPython.cpp
+source/Interpreter/LLDBWrapPython.cpp.d
+source/Interpreter/lldb.py
+Release
+Release+Asserts
+Debug
+Debug+Asserts
