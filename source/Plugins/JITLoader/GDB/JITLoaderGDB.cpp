@@ -180,8 +180,6 @@ JITLoaderGDB::ReadJITDescriptor(bool init) {
     }
 
     while ( jit_relevant_entry != 0 ) {
-        printf("READING ONE ENTRY\n");
-
         jit_code_entry jit_entry;
         const size_t jit_entry_size = sizeof(jit_entry);
         bytes_read = m_process->DoReadMemory(jit_relevant_entry, &jit_entry, jit_entry_size, error);
