@@ -15,6 +15,7 @@
 #include "lldb/Core/Module.h"
 #include "lldb/Core/ModuleSpec.h"
 #include "lldb/Core/Section.h"
+#include "lldb/Core/StreamString.h"
 #include "lldb/Target/Process.h"
 #include "lldb/Target/SectionLoadList.h"
 #include "lldb/Target/Target.h"
@@ -41,6 +42,7 @@ JITLoaderGDB::~JITLoaderGDB ()
 void JITLoaderGDB::DidAttach() 
 {
     SetJITBreakpoint();
+    ReadJITDescriptor(true);
 }
 
 void JITLoaderGDB::DidLaunch() 
@@ -123,10 +125,15 @@ JITLoaderGDB::JITDebugBreakpointHit(void *baton,
     if (log)
         log->Printf("JIT Breakpoint hit!");
     JITLoaderGDB* instance = static_cast<JITLoaderGDB*>(baton);
-    Process *process = instance->m_process;
+    return instance->ReadJITDescriptor();
+}
+
+bool
+JITLoaderGDB::ReadJITDescriptor(bool init) {
+    Log *log(GetLogIfAnyCategoriesSet(LIBLLDB_LOG_JIT_LOADER));
 
     SymbolContextList target_symbols;
-    Target &target = process->GetTarget();
+    Target &target = m_process->GetTarget();
     ModuleList &images = target.GetImages();
 
     if (!images.FindSymbolsWithNameAndType(ConstString("__jit_debug_descriptor"), eSymbolTypeData, target_symbols))
@@ -158,85 +165,108 @@ JITLoaderGDB::JITDebugBreakpointHit(void *baton,
     jit_descriptor jit_desc;
     const size_t jit_desc_size = sizeof(jit_desc);
     Error error;
-    size_t bytes_read = process->DoReadMemory(jit_addr, &jit_desc, jit_desc_size, error);
+    size_t bytes_read = m_process->DoReadMemory(jit_addr, &jit_desc, jit_desc_size, error);
     if (bytes_read != jit_desc_size || !error.Success()) {
         if (log)
             log->Printf("Failed to read the JIT descirptor");
         return false;
     }
 
-    jit_code_entry jit_entry;
-    const addr_t &jit_relevant_entry = (addr_t)jit_desc.relevant_entry;
-
-    const size_t jit_entry_size = sizeof(jit_entry);
-    bytes_read = process->DoReadMemory(jit_relevant_entry, &jit_entry, jit_entry_size, error);
-    if (bytes_read != jit_entry_size || !error.Success()) {
-        if (log)
-        log->Printf("Failed to read the JIT entry!");
-        return false;
+    jit_actions_t jit_action = (jit_actions_t)jit_desc.action_flag;
+    addr_t jit_relevant_entry = (addr_t)jit_desc.relevant_entry;
+    if ( init ) {
+        jit_action = JIT_REGISTER_FN;
+        jit_relevant_entry = (addr_t)jit_desc.first_entry;
     }
 
-    const jit_actions_t &jit_action = (jit_actions_t)jit_desc.action_flag;
-    const addr_t &symbolfile_addr = (addr_t)jit_entry.symfile_addr;
-    const size_t &symbolfile_size = (size_t)jit_entry.symfile_size;
-    JITObjectMap &jit_objects = instance->m_jit_objects;
-    ModuleSP module_sp;
+    while ( jit_relevant_entry != 0 ) {
+        printf("READING ONE ENTRY\n");
 
-    if (jit_action == JIT_REGISTER_FN)
-    {
-        if (log)
-            log->Printf("Registering Function!");
-        module_sp = process->ReadModuleFromMemory(FileSpec("in_memory_object", false), symbolfile_addr, symbolfile_size);
-        if (module_sp)
-        {
-            bool changed;
-            jit_objects.insert(std::pair<lldb::addr_t,const lldb::ModuleSP>(symbolfile_addr,module_sp));
-            module_sp->SetLoadAddress(target, 0, changed);
-            images.AppendIfNeeded(module_sp);
-            SymbolFileDWARF *s = static_cast<SymbolFileDWARF*>(module_sp->GetSymbolVendor()->GetSymbolFile());
-            //s->Index();
-            //s->DumpIndexes();
-        } else {
+        jit_code_entry jit_entry;
+        const size_t jit_entry_size = sizeof(jit_entry);
+        bytes_read = m_process->DoReadMemory(jit_relevant_entry, &jit_entry, jit_entry_size, error);
+        if (bytes_read != jit_entry_size || !error.Success()) {
             if (log)
-                log->Printf("Failed to load Module!");
+            log->Printf("Failed to read the JIT entry!");
+            return false;
         }
-    }
-    else if (jit_action == JIT_UNREGISTER_FN)
-    {
-        if (log)
-            log->Printf("Unregistering Function!");
-        JITObjectMap::iterator it = jit_objects.find(symbolfile_addr);
-        if (it != jit_objects.end())
+
+        const addr_t &symbolfile_addr = (addr_t)jit_entry.symfile_addr;
+        const size_t &symbolfile_size = (size_t)jit_entry.symfile_size;
+        ModuleSP module_sp;
+
+        if (jit_action == JIT_REGISTER_FN)
         {
-            module_sp = it->second;
-            ObjectFile *image_object_file = module_sp->GetObjectFile();
-            if (image_object_file)
+            if (log)
+                log->Printf("Registering Function!");
+            module_sp = m_process->ReadModuleFromMemory(FileSpec("JIT", false), symbolfile_addr, symbolfile_size);
+            if (module_sp)
             {
-                const SectionList *section_list = image_object_file->GetSectionList ();
-                if (section_list)
+                bool changed;
+                m_jit_objects.insert(std::pair<lldb::addr_t,const lldb::ModuleSP>(symbolfile_addr,module_sp));
+                module_sp->SetLoadAddress(target, 0, changed);
+                images.AppendIfNeeded(module_sp);
+
+                ModuleList module_list;
+                module_list.Append(module_sp);
+                target.ModulesDidLoad(module_list);
+
+                /*
+                StreamString ss;
+                module_sp->Dump(&ss);
+                printf("%s\n", ss.GetString().c_str());
+                */
+
+                //SymbolFileDWARF *s = static_cast<SymbolFileDWARF*>(module_sp->GetSymbolVendor()->GetSymbolFile());
+                //s->Index();
+                //s->DumpIndexes();
+            } else {
+                if (log)
+                    log->Printf("Failed to load Module!");
+            }
+        }
+        else if (jit_action == JIT_UNREGISTER_FN)
+        {
+            if (log)
+                log->Printf("Unregistering Function!");
+            JITObjectMap::iterator it = m_jit_objects.find(symbolfile_addr);
+            if (it != m_jit_objects.end())
+            {
+                module_sp = it->second;
+                ObjectFile *image_object_file = module_sp->GetObjectFile();
+                if (image_object_file)
                 {
-                    const uint32_t num_sections = section_list->GetSize();
-                    for (uint32_t i = 0; i<num_sections; ++i)
+                    const SectionList *section_list = image_object_file->GetSectionList ();
+                    if (section_list)
                     {
-                        SectionSP section_sp(section_list->GetSectionAtIndex(i));
-                        if (section_sp)
+                        const uint32_t num_sections = section_list->GetSize();
+                        for (uint32_t i = 0; i<num_sections; ++i)
                         {
-                            target.GetSectionLoadList().SetSectionUnloaded (section_sp);
+                            SectionSP section_sp(section_list->GetSectionAtIndex(i));
+                            if (section_sp)
+                            {
+                                target.GetSectionLoadList().SetSectionUnloaded (section_sp);
+                            }
                         }
                     }
                 }
+                images.Remove(module_sp);
+                m_jit_objects.erase(it);
             }
-            images.Remove(module_sp);
-            jit_objects.erase(it);
         }
-    }
-    else if (jit_action == JIT_NOACTION)
-    {
-        // Nothing to do
-    }
-    else
-    {
-        assert(false && "Unknown jit action");
+        else if (jit_action == JIT_NOACTION)
+        {
+            // Nothing to do
+        }
+        else
+        {
+            assert(false && "Unknown jit action");
+        }
+
+        if ( init )
+            jit_relevant_entry = (addr_t)jit_entry.next_entry;
+        else
+            jit_relevant_entry = 0;
     }
 
     return false; // Continue Running.
