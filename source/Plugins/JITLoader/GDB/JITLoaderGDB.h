@@ -73,6 +73,9 @@ private:
     void
     SetJITBreakpoint();
 
+    bool
+    ReadJITDescriptor(bool init = false);
+
     static bool
     JITDebugBreakpointHit(void *baton,
                           lldb_private::StoppointCallbackContext *context,
