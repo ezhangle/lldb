@@ -1570,8 +1570,9 @@ ParseTrieEntries (DataExtractor &data,
 			e.entry.address = data.GetULEB128(&offset);
 			if ( e.entry.flags & EXPORT_SYMBOL_FLAGS_STUB_AND_RESOLVER )
             {
-                resolver_addresses.insert(e.entry.address);
+                //resolver_addresses.insert(e.entry.address);
 				e.entry.other = data.GetULEB128(&offset);
+                resolver_addresses.insert(e.entry.other);
             }
 			else
 				e.entry.other = 0;
@@ -2004,7 +2005,7 @@ ObjectFileMachO::ParseSymtab ()
         std::vector<uint32_t> N_INCL_indexes;
         std::vector<uint32_t> N_BRAC_indexes;
         std::vector<uint32_t> N_COMM_indexes;
-        typedef std::map <uint64_t, uint32_t> ValueToSymbolIndexMap;
+        typedef std::multimap <uint64_t, uint32_t> ValueToSymbolIndexMap;
         typedef std::map <uint32_t, uint32_t> NListIndexToSymbolIndexMap;
         typedef std::map <const char *, uint32_t> ConstNameToSymbolIndexMap;
         ValueToSymbolIndexMap N_FUN_addr_to_sym_idx;
@@ -2021,6 +2022,31 @@ ObjectFileMachO::ParseSymtab ()
         size_t num_syms = 0;
         std::string memory_symbol_name;
         uint32_t unmapped_local_symbols_found = 0;
+
+        std::vector<TrieEntryWithOffset> trie_entries;
+        std::set<lldb::addr_t> resolver_addresses;
+
+        if (dyld_trie_data.GetByteSize() > 0)
+        {
+            std::vector<llvm::StringRef> nameSlices;
+            ParseTrieEntries (dyld_trie_data,
+                              0,
+                              nameSlices,
+                              resolver_addresses,
+                              trie_entries);
+            
+            ConstString text_segment_name ("__TEXT");
+            SectionSP text_segment_sp = GetSectionList()->FindSectionByName(text_segment_name);
+            if (text_segment_sp)
+            {
+                const lldb::addr_t text_segment_file_addr = text_segment_sp->GetFileAddress();
+                if (text_segment_file_addr != LLDB_INVALID_ADDRESS)
+                {
+                    for (auto &e : trie_entries)
+                        e.entry.address += text_segment_file_addr;
+                }
+            }
+        }
 
 #if defined (__APPLE__) && defined (__arm__)
 
@@ -2314,7 +2340,7 @@ ObjectFileMachO::ParseSymtab ()
                                                             type = eSymbolTypeCode;
                                                             symbol_section = section_info.GetSection (nlist.n_sect, nlist.n_value);
 
-                                                            N_FUN_addr_to_sym_idx[nlist.n_value] = sym_idx;
+                                                            N_FUN_addr_to_sym_idx.insert(std::make_pair(nlist.n_value, sym_idx));
                                                             // We use the current number of symbols in the symbol table in lieu of
                                                             // using nlist_idx in case we ever start trimming entries out
                                                             N_FUN_indexes.push_back(sym_idx);
@@ -2339,7 +2365,7 @@ ObjectFileMachO::ParseSymtab ()
 
                                                     case N_STSYM:
                                                         // static symbol: name,,n_sect,type,address
-                                                        N_STSYM_addr_to_sym_idx[nlist.n_value] = sym_idx;
+                                                        N_STSYM_addr_to_sym_idx.insert(std::make_pair(nlist.n_value, sym_idx));
                                                         symbol_section = section_info.GetSection (nlist.n_sect, nlist.n_value);
                                                         type = eSymbolTypeData;
                                                         break;
@@ -2847,19 +2873,34 @@ ObjectFileMachO::ParseSymtab ()
                                                         // If we do find a match, and the name matches, then we
                                                         // can merge the two into just the function symbol to avoid
                                                         // duplicate entries in the symbol table
-                                                        ValueToSymbolIndexMap::const_iterator pos = N_FUN_addr_to_sym_idx.find (nlist.n_value);
-                                                        if (pos != N_FUN_addr_to_sym_idx.end())
+                                                        std::pair<ValueToSymbolIndexMap::const_iterator, ValueToSymbolIndexMap::const_iterator> range;
+                                                        range = N_FUN_addr_to_sym_idx.equal_range(nlist.n_value);
+                                                        if (range.first != range.second)
                                                         {
-                                                            if (sym[sym_idx].GetMangled().GetName(Mangled::ePreferMangled) == sym[pos->second].GetMangled().GetName(Mangled::ePreferMangled))
+                                                            bool found_it = false;
+                                                            for (ValueToSymbolIndexMap::const_iterator pos = range.first; pos != range.second; ++pos)
                                                             {
-                                                                m_nlist_idx_to_sym_idx[nlist_idx] = pos->second;
-                                                                // We just need the flags from the linker symbol, so put these flags
-                                                                // into the N_FUN flags to avoid duplicate symbols in the symbol table
-                                                                sym[pos->second].SetExternal(sym[sym_idx].IsExternal());
-                                                                sym[pos->second].SetFlags (nlist.n_type << 16 | nlist.n_desc);
-                                                                sym[sym_idx].Clear();
-                                                                continue;
+                                                                if (sym[sym_idx].GetMangled().GetName(Mangled::ePreferMangled) == sym[pos->second].GetMangled().GetName(Mangled::ePreferMangled))
+                                                                {
+                                                                    m_nlist_idx_to_sym_idx[nlist_idx] = pos->second;
+                                                                    // We just need the flags from the linker symbol, so put these flags
+                                                                    // into the N_FUN flags to avoid duplicate symbols in the symbol table
+                                                                    sym[pos->second].SetExternal(sym[sym_idx].IsExternal());
+                                                                    sym[pos->second].SetFlags (nlist.n_type << 16 | nlist.n_desc);
+                                                                    if (resolver_addresses.find(nlist.n_value) != resolver_addresses.end())
+                                                                        sym[pos->second].SetType (eSymbolTypeResolver);
+                                                                    sym[sym_idx].Clear();
+                                                                    found_it = true;
+                                                                    break;
+                                                                }
                                                             }
+                                                            if (found_it)
+                                                                continue;
+                                                        }
+                                                        else
+                                                        {
+                                                            if (resolver_addresses.find(nlist.n_value) != resolver_addresses.end())
+                                                                type = eSymbolTypeResolver;
                                                         }
                                                     }
                                                     else if (type == eSymbolTypeData)
@@ -2868,19 +2909,27 @@ ObjectFileMachO::ParseSymtab ()
                                                         // If we do find a match, and the name matches, then we
                                                         // can merge the two into just the Static symbol to avoid
                                                         // duplicate entries in the symbol table
-                                                        ValueToSymbolIndexMap::const_iterator pos = N_STSYM_addr_to_sym_idx.find (nlist.n_value);
-                                                        if (pos != N_STSYM_addr_to_sym_idx.end())
+                                                        std::pair<ValueToSymbolIndexMap::const_iterator, ValueToSymbolIndexMap::const_iterator> range;
+                                                        range = N_STSYM_addr_to_sym_idx.equal_range(nlist.n_value);
+                                                        if (range.first != range.second)
                                                         {
-                                                            if (sym[sym_idx].GetMangled().GetName(Mangled::ePreferMangled) == sym[pos->second].GetMangled().GetName(Mangled::ePreferMangled))
+                                                            bool found_it = false;
+                                                            for (ValueToSymbolIndexMap::const_iterator pos = range.first; pos != range.second; ++pos)
                                                             {
-                                                                m_nlist_idx_to_sym_idx[nlist_idx] = pos->second;
-                                                                // We just need the flags from the linker symbol, so put these flags
-                                                                // into the N_STSYM flags to avoid duplicate symbols in the symbol table
-                                                                sym[pos->second].SetExternal(sym[sym_idx].IsExternal());
-                                                                sym[pos->second].SetFlags (nlist.n_type << 16 | nlist.n_desc);
-                                                                sym[sym_idx].Clear();
-                                                                continue;
+                                                                if (sym[sym_idx].GetMangled().GetName(Mangled::ePreferMangled) == sym[pos->second].GetMangled().GetName(Mangled::ePreferMangled))
+                                                                {
+                                                                    m_nlist_idx_to_sym_idx[nlist_idx] = pos->second;
+                                                                    // We just need the flags from the linker symbol, so put these flags
+                                                                    // into the N_STSYM flags to avoid duplicate symbols in the symbol table
+                                                                    sym[pos->second].SetExternal(sym[sym_idx].IsExternal());
+                                                                    sym[pos->second].SetFlags (nlist.n_type << 16 | nlist.n_desc);
+                                                                    sym[sym_idx].Clear();
+                                                                    found_it = true;
+                                                                    break;
+                                                                }
                                                             }
+                                                            if (found_it)
+                                                                continue;
                                                         }
                                                         else
                                                         {
@@ -2937,7 +2986,7 @@ ObjectFileMachO::ParseSymtab ()
         // Must reset this in case it was mutated above!
         nlist_data_offset = 0;
 #endif
-        
+
         if (nlist_data.GetByteSize() > 0)
         {
 
@@ -3056,7 +3105,7 @@ ObjectFileMachO::ParseSymtab ()
                             type = eSymbolTypeCode;
                             symbol_section = section_info.GetSection (nlist.n_sect, nlist.n_value);
 
-                            N_FUN_addr_to_sym_idx[nlist.n_value] = sym_idx;
+                            N_FUN_addr_to_sym_idx.insert(std::make_pair(nlist.n_value, sym_idx));
                             // We use the current number of symbols in the symbol table in lieu of
                             // using nlist_idx in case we ever start trimming entries out
                             N_FUN_indexes.push_back(sym_idx);
@@ -3081,7 +3130,7 @@ ObjectFileMachO::ParseSymtab ()
 
                     case N_STSYM:
                         // static symbol: name,,n_sect,type,address
-                        N_STSYM_addr_to_sym_idx[nlist.n_value] = sym_idx;
+                        N_STSYM_addr_to_sym_idx.insert(std::make_pair(nlist.n_value, sym_idx));
                         symbol_section = section_info.GetSection (nlist.n_sect, nlist.n_value);
                         type = eSymbolTypeData;
                         break;
@@ -3594,19 +3643,34 @@ ObjectFileMachO::ParseSymtab ()
                             // If we do find a match, and the name matches, then we
                             // can merge the two into just the function symbol to avoid
                             // duplicate entries in the symbol table
-                            ValueToSymbolIndexMap::const_iterator pos = N_FUN_addr_to_sym_idx.find (nlist.n_value);
-                            if (pos != N_FUN_addr_to_sym_idx.end())
+                            std::pair<ValueToSymbolIndexMap::const_iterator, ValueToSymbolIndexMap::const_iterator> range;
+                            range = N_FUN_addr_to_sym_idx.equal_range(nlist.n_value);
+                            if (range.first != range.second)
                             {
-                                if (sym[sym_idx].GetMangled().GetName(Mangled::ePreferMangled) == sym[pos->second].GetMangled().GetName(Mangled::ePreferMangled))
+                                bool found_it = false;
+                                for (ValueToSymbolIndexMap::const_iterator pos = range.first; pos != range.second; ++pos)
                                 {
-                                    m_nlist_idx_to_sym_idx[nlist_idx] = pos->second;
-                                    // We just need the flags from the linker symbol, so put these flags
-                                    // into the N_FUN flags to avoid duplicate symbols in the symbol table
-                                    sym[pos->second].SetExternal(sym[sym_idx].IsExternal());
-                                    sym[pos->second].SetFlags (nlist.n_type << 16 | nlist.n_desc);
-                                    sym[sym_idx].Clear();
-                                    continue;
+                                    if (sym[sym_idx].GetMangled().GetName(Mangled::ePreferMangled) == sym[pos->second].GetMangled().GetName(Mangled::ePreferMangled))
+                                    {
+                                        m_nlist_idx_to_sym_idx[nlist_idx] = pos->second;
+                                        // We just need the flags from the linker symbol, so put these flags
+                                        // into the N_FUN flags to avoid duplicate symbols in the symbol table
+                                        sym[pos->second].SetExternal(sym[sym_idx].IsExternal());
+                                        sym[pos->second].SetFlags (nlist.n_type << 16 | nlist.n_desc);
+                                        if (resolver_addresses.find(nlist.n_value) != resolver_addresses.end())
+                                            sym[pos->second].SetType (eSymbolTypeResolver);
+                                        sym[sym_idx].Clear();
+                                        found_it = true;
+                                        break;
+                                    }
                                 }
+                                if (found_it)
+                                    continue;
+                            }
+                            else
+                            {
+                                if (resolver_addresses.find(nlist.n_value) != resolver_addresses.end())
+                                    type = eSymbolTypeResolver;
                             }
                         }
                         else if (type == eSymbolTypeData)
@@ -3615,19 +3679,27 @@ ObjectFileMachO::ParseSymtab ()
                             // If we do find a match, and the name matches, then we
                             // can merge the two into just the Static symbol to avoid
                             // duplicate entries in the symbol table
-                            ValueToSymbolIndexMap::const_iterator pos = N_STSYM_addr_to_sym_idx.find (nlist.n_value);
-                            if (pos != N_STSYM_addr_to_sym_idx.end())
+                            std::pair<ValueToSymbolIndexMap::const_iterator, ValueToSymbolIndexMap::const_iterator> range;
+                            range = N_STSYM_addr_to_sym_idx.equal_range(nlist.n_value);
+                            if (range.first != range.second)
                             {
-                                if (sym[sym_idx].GetMangled().GetName(Mangled::ePreferMangled) == sym[pos->second].GetMangled().GetName(Mangled::ePreferMangled))
+                                bool found_it = false;
+                                for (ValueToSymbolIndexMap::const_iterator pos = range.first; pos != range.second; ++pos)
                                 {
-                                    m_nlist_idx_to_sym_idx[nlist_idx] = pos->second;
-                                    // We just need the flags from the linker symbol, so put these flags
-                                    // into the N_STSYM flags to avoid duplicate symbols in the symbol table
-                                    sym[pos->second].SetExternal(sym[sym_idx].IsExternal());
-                                    sym[pos->second].SetFlags (nlist.n_type << 16 | nlist.n_desc);
-                                    sym[sym_idx].Clear();
-                                    continue;
+                                    if (sym[sym_idx].GetMangled().GetName(Mangled::ePreferMangled) == sym[pos->second].GetMangled().GetName(Mangled::ePreferMangled))
+                                    {
+                                        m_nlist_idx_to_sym_idx[nlist_idx] = pos->second;
+                                        // We just need the flags from the linker symbol, so put these flags
+                                        // into the N_STSYM flags to avoid duplicate symbols in the symbol table
+                                        sym[pos->second].SetExternal(sym[sym_idx].IsExternal());
+                                        sym[pos->second].SetFlags (nlist.n_type << 16 | nlist.n_desc);
+                                        sym[sym_idx].Clear();
+                                        found_it = true;
+                                        break;
+                                    }
                                 }
+                                if (found_it)
+                                    continue;
                             }
                             else
                             {
@@ -3759,31 +3831,6 @@ ObjectFileMachO::ParseSymtab ()
         {
             num_syms = sym_idx;
             sym = symtab->Resize (num_syms);
-        }
-
-        std::vector<TrieEntryWithOffset> trie_entries;
-        std::set<lldb::addr_t> resolver_addresses;
-
-        if (dyld_trie_data.GetByteSize() > 0)
-        {
-            std::vector<llvm::StringRef> nameSlices;
-            ParseTrieEntries (dyld_trie_data,
-                              0,
-                              nameSlices,
-                              resolver_addresses,
-                              trie_entries);
-            
-            ConstString text_segment_name ("__TEXT");
-            SectionSP text_segment_sp = GetSectionList()->FindSectionByName(text_segment_name);
-            if (text_segment_sp)
-            {
-                const lldb::addr_t text_segment_file_addr = text_segment_sp->GetFileAddress();
-                if (text_segment_file_addr != LLDB_INVALID_ADDRESS)
-                {
-                    for (auto &e : trie_entries)
-                        e.entry.address += text_segment_file_addr;
-                }
-            }
         }
 
         // Now synthesize indirect symbols

@@ -13,12 +13,12 @@
 #include <errno.h>
 #include <limits.h>
 #include <sys/types.h>
-#include <unistd.h>
 #ifdef _WIN32
 #include "lldb/Host/windows/windows.h"
 #include <winsock2.h>
 #include <WS2tcpip.h>
 #else
+#include <unistd.h>
 #include <dlfcn.h>
 #include <grp.h>
 #include <netdb.h>
@@ -368,25 +368,31 @@ Host::GetArchitecture (SystemDefaultArchitecture arch_kind)
         // If the OS is Linux, "unknown" in the vendor slot isn't what we want
         // for the default triple.  It's probably an artifact of config.guess.
         if (triple.getOS() == llvm::Triple::Linux && triple.getVendor() == llvm::Triple::UnknownVendor)
-            triple.setVendorName("");
+            triple.setVendorName ("");
+
+        const char* distribution_id = GetDistributionId ().AsCString();
 
         switch (triple.getArch())
         {
         default:
             g_host_arch_32.SetTriple(triple);
+            g_host_arch_32.SetDistributionId (distribution_id);
             g_supports_32 = true;
             break;
 
         case llvm::Triple::x86_64:
             g_host_arch_64.SetTriple(triple);
+            g_host_arch_64.SetDistributionId (distribution_id);
             g_supports_64 = true;
             g_host_arch_32.SetTriple(triple.get32BitArchVariant());
+            g_host_arch_32.SetDistributionId (distribution_id);
             g_supports_32 = true;
             break;
 
         case llvm::Triple::sparcv9:
         case llvm::Triple::ppc64:
             g_host_arch_64.SetTriple(triple);
+            g_host_arch_64.SetDistributionId (distribution_id);
             g_supports_64 = true;
             break;
         }
@@ -445,6 +451,19 @@ Host::GetTargetTriple()
     }
     return g_host_triple;
 }
+
+// See linux/Host.cpp for Linux-based implementations of this.
+// Add your platform-specific implementation to the appropriate host file.
+#if !defined(__linux__)
+
+const ConstString &
+    Host::GetDistributionId ()
+{
+    static ConstString s_distribution_id;
+    return s_distribution_id;
+}
+
+#endif // #if !defined(__linux__)
 
 lldb::pid_t
 Host::GetCurrentProcessID()
