@@ -3596,7 +3596,7 @@ Process::Halt (bool clear_thread_plans)
                     // Wait for 1 second for the process to stop.
                     TimeValue timeout_time;
                     timeout_time = TimeValue::Now();
-                    timeout_time.OffsetWithSeconds(1);
+                    timeout_time.OffsetWithSeconds(10);
                     bool got_event = halt_listener.WaitForEvent (&timeout_time, event_sp);
                     StateType state = ProcessEventData::GetStateFromEvent(event_sp.get());
                     
