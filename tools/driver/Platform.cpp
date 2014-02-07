@@ -37,6 +37,7 @@ WINAPI CtrlHandler (DWORD ctrlType)
 int
 ioctl (int d, int request, ...)
 {
+	return 0;
     switch ( request )
     {
     // request the console windows size

@@ -14,6 +14,12 @@ include_directories(
   )
 endif ()
 
+if ( CMAKE_SYSTEM_NAME MATCHES "Windows" )
+include_directories(
+  Plugins/Process/Windows
+  )
+endif ()
+
 add_subdirectory(API)
 add_subdirectory(Breakpoint)
 add_subdirectory(Commands)
@@ -81,6 +87,7 @@ set( LLDB_USED_LIBS
 if ( CMAKE_SYSTEM_NAME MATCHES "Windows" )
   list(APPEND LLDB_USED_LIBS
     lldbHostWindows
+    lldbPluginProcessWindows
     Ws2_32
     )
 endif ()

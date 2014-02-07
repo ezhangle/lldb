@@ -215,7 +215,8 @@ namespace lldb {
         eErrorTypeInvalid,
         eErrorTypeGeneric,      ///< Generic errors that can be any value.
         eErrorTypeMachKernel,   ///< Mach kernel error codes.
-        eErrorTypePOSIX         ///< POSIX error codes.
+        eErrorTypePOSIX,        ///< POSIX error codes.
+        eErrorTypeWindows       ///< Windows error codes.
     } ErrorType;
 
 

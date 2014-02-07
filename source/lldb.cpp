@@ -79,6 +79,10 @@
 #include "Plugins/Process/FreeBSD/ProcessFreeBSD.h"
 #endif
 
+#if defined (_WIN32)
+#include "Plugins/Process/Windows/ProcessWindows.h"
+#endif
+
 #include "Plugins/Platform/gdb-server/PlatformRemoteGDBServer.h"
 #include "Plugins/Process/gdb-remote/ProcessGDBRemote.h"
 #include "Plugins/DynamicLoader/Static/DynamicLoaderStatic.h"
@@ -156,6 +160,9 @@ lldb_private::Initialize ()
 
 #if defined(__linux__) || defined(__FreeBSD__)
         ProcessElfCore::Initialize();
+#endif
+#if defined (_WIN32)
+        ProcessWindows::Initialize();
 #endif
         //----------------------------------------------------------------------
         // Platform agnostic plugins
@@ -240,6 +247,11 @@ lldb_private::Terminate ()
 #if defined(__linux__) || defined(__FreeBSD__)
     ProcessElfCore::Terminate();
 #endif
+
+#if defined(_WIN32)
+    ProcessWindows::Terminate();
+#endif
+
     ProcessGDBRemote::Terminate();
     DynamicLoaderStatic::Terminate();
 

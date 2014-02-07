@@ -17,6 +17,7 @@
 // Project includes
 #include "lldb/Core/Error.h"
 #include "lldb/Core/Log.h"
+#include "lldb/Host/windows/windows.h"
 #include "llvm/ADT/SmallVector.h"
 #include <cerrno>
 #include <cstdarg>
@@ -284,6 +285,20 @@ Error::SetErrorToErrno()
 {
     m_code = errno;
     m_type = eErrorTypePOSIX;
+    m_string.clear();
+}
+
+//----------------------------------------------------------------------
+// Update the error value to be the result of GetLastError() and the
+// type to be "Windows".
+//----------------------------------------------------------------------
+void
+Error::SetErrorToGetLastError()
+{
+#if defined (_WIN32)
+    m_code = GetLastError();
+#endif
+    m_type = eErrorTypeWindows;
     m_string.clear();
 }
 

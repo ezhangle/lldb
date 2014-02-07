@@ -234,6 +234,16 @@ public:
     SetErrorToErrno ();
 
     //------------------------------------------------------------------
+    /// Windows-only
+    /// Set the current error to the result of GetLastError().
+    ///
+    /// Update the error value to \c GetLastError() value and update the 
+    /// type to be \c Error::Windows.
+    //------------------------------------------------------------------
+    void
+    SetErrorToGetLastError ();
+
+    //------------------------------------------------------------------
     /// Set the current error to a generic error.
     ///
     /// Update the error value to be \c LLDB_GENERIC_ERROR and update the
