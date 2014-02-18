@@ -656,6 +656,13 @@ PlatformDarwinKernel::GetSupportedArchitectureAtIndex (uint32_t idx, ArchSpec &a
 #endif
 }
 
+void
+PlatformDarwinKernel::CalculateTrapHandlerSymbolNames ()
+{   
+    m_trap_handlers.push_back(ConstString ("trap_from_kernel"));
+    m_trap_handlers.push_back(ConstString ("hndl_double_fault"));
+}   
+
 #else  // __APPLE__
 
 // Since DynamicLoaderDarwinKernel is compiled in for all systems, and relies on
@@ -672,6 +679,5 @@ PlatformDarwinKernel::GetPluginNameStatic ()
     static lldb_private::ConstString g_name("darwin-kernel");
     return g_name;
 }
-
 
 #endif // __APPLE__

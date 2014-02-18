@@ -535,7 +535,8 @@ public:
         m_resume_count (0),
         m_monitor_callback (NULL),
         m_monitor_callback_baton (NULL),
-        m_monitor_signals (false)
+        m_monitor_signals (false),
+        m_hijack_listener_sp ()
     {
     }
 
@@ -554,7 +555,8 @@ public:
         m_resume_count (0),
         m_monitor_callback (NULL),
         m_monitor_callback_baton (NULL),
-        m_monitor_signals (false)
+        m_monitor_signals (false),
+        m_hijack_listener_sp ()
     {
         if (stdin_path)
         {
@@ -781,6 +783,7 @@ public:
         m_flags.Clear();
         m_file_actions.clear();
         m_resume_count = 0;
+        m_hijack_listener_sp.reset();
     }
 
     bool
@@ -798,6 +801,18 @@ public:
         m_monitor_callback = callback;
         m_monitor_callback_baton = baton;
         m_monitor_signals = monitor_signals;
+    }
+
+    Host::MonitorChildProcessCallback
+    GetMonitorProcessCallback ()
+    {
+        return m_monitor_callback;
+    }
+
+    const void*
+    GetMonitorProcessBaton () const
+    {
+        return m_monitor_callback_baton;
     }
 
     bool
@@ -819,6 +834,19 @@ public:
     {
         return m_pty;
     }
+    
+    lldb::ListenerSP
+    GetHijackListener () const
+    {
+        return m_hijack_listener_sp;
+    }
+    
+    void
+    SetHijackListener (const lldb::ListenerSP &listener_sp)
+    {
+        m_hijack_listener_sp = listener_sp;
+    }
+
 
 protected:
     std::string m_working_dir;
@@ -831,7 +859,7 @@ protected:
     Host::MonitorChildProcessCallback m_monitor_callback;
     void *m_monitor_callback_baton;
     bool m_monitor_signals;
-
+    lldb::ListenerSP m_hijack_listener_sp;
 };
 
 //----------------------------------------------------------------------
@@ -864,6 +892,7 @@ public:
         ProcessInfo::operator= (launch_info);
         SetProcessPluginName (launch_info.GetProcessPluginName());
         SetResumeCount (launch_info.GetResumeCount());
+        SetHijackListener(launch_info.GetHijackListener());
     }
     
     bool
@@ -953,7 +982,22 @@ public:
             return true;
         return false;
     }
+    
+    lldb::ListenerSP
+    GetHijackListener () const
+    {
+        return m_hijack_listener_sp;
+    }
+    
+    void
+    SetHijackListener (const lldb::ListenerSP &listener_sp)
+    {
+        m_hijack_listener_sp = listener_sp;
+    }
+    
+
 protected:
+    lldb::ListenerSP m_hijack_listener_sp;
     std::string m_plugin_name;
     uint32_t m_resume_count; // How many times do we resume after launching
     bool m_wait_for_launch;
@@ -1367,10 +1411,11 @@ class Process :
     public ExecutionContextScope,
     public PluginInterface
 {
-friend class ThreadList;
-friend class ClangFunction; // For WaitForStateChangeEventsPrivate
-friend class ProcessEventData;
-friend class StopInfo;
+    friend class ClangFunction; // For WaitForStateChangeEventsPrivate
+    friend class ProcessEventData;
+    friend class StopInfo;
+    friend class Target;
+    friend class ThreadList;
 
 public:
 
@@ -2995,8 +3040,8 @@ public:
     ResolveIndirectFunction(const Address *address, Error &error);
 
     virtual Error
-    GetMemoryRegionInfo (lldb::addr_t load_addr, 
-                        MemoryRegionInfo &range_info)
+    GetMemoryRegionInfo (lldb::addr_t load_addr,
+                         MemoryRegionInfo &range_info)
     {
         Error error;
         error.SetErrorString ("Process::GetMemoryRegionInfo() not supported");
@@ -3331,15 +3376,6 @@ public:
     uint32_t
     AssignIndexIDToThread(uint64_t thread_id);
 
-    // Returns true if an index id has been assigned to a queue.
-    bool
-    HasAssignedIndexIDToQueue(lldb::queue_id_t queue_id);
-
-    // Given a queue_id, it will assign a more reasonable index id for display to the user.
-    // If the queue_id has previously been assigned, the same index id will be used.
-    uint32_t
-    AssignIndexIDToQueue(lldb::queue_id_t queue_id);
-
     //------------------------------------------------------------------
     // Queue Queries
     //------------------------------------------------------------------
@@ -3371,10 +3407,15 @@ public:
     // is set to the event which triggered the stop. If wait_always = false,
     // and the process is already stopped, this function returns immediately.
     lldb::StateType
-    WaitForProcessToStop (const TimeValue *timeout, lldb::EventSP *event_sp_ptr = NULL, bool wait_always = true);
+    WaitForProcessToStop (const TimeValue *timeout,
+                          lldb::EventSP *event_sp_ptr = NULL,
+                          bool wait_always = true,
+                          Listener *hijack_listener = NULL);
 
     lldb::StateType
-    WaitForStateChangedEvents (const TimeValue *timeout, lldb::EventSP &event_sp);
+    WaitForStateChangedEvents (const TimeValue *timeout,
+                               lldb::EventSP &event_sp,
+                               Listener *hijack_listener); // Pass NULL to use builtin listener
     
     Event *
     PeekAtStateChangedEvents ();
@@ -3541,6 +3582,12 @@ public:
     void
     SetSTDIOFileDescriptor (int file_descriptor);
 
+    void
+    WatchForSTDIN (IOHandler &io_handler);
+    
+    void
+    CancelWatchForSTDIN (bool exited);
+    
     //------------------------------------------------------------------
     // Add a permanent region of memory that should never be read or 
     // written to. This can be used to ensure that memory reads or writes
@@ -3710,9 +3757,7 @@ protected:
     ProcessModID                m_mod_id;               ///< Tracks the state of the process over stops and other alterations.
     uint32_t                    m_process_unique_id;    ///< Each lldb_private::Process class that is created gets a unique integer ID that increments with each new instance
     uint32_t                    m_thread_index_id;      ///< Each thread is created with a 1 based index that won't get re-used.
-    uint32_t                    m_queue_index_id;       ///< Each queue is created with a 1 based index that won't get re-used.
     std::map<uint64_t, uint32_t> m_thread_id_to_index_id_map;
-    std::map<uint64_t, uint32_t> m_queue_id_to_index_id_map;
     int                         m_exit_status;          ///< The exit status of the process, or -1 if not set.
     std::string                 m_exit_string;          ///< A textual description of why a process exited.
     Mutex                       m_thread_mutex;
@@ -3735,7 +3780,7 @@ protected:
     std::unique_ptr<SystemRuntime> m_system_runtime_ap;
     UnixSignals                 m_unix_signals;         /// This is the current signal set for this process.
     lldb::ABISP                 m_abi_sp;
-    lldb::InputReaderSP         m_process_input_reader;
+    lldb::IOHandlerSP           m_process_input_reader;
     Communication               m_stdio_communication;
     Mutex                       m_stdio_communication_mutex;
     std::string                 m_stdout_data;
@@ -3832,21 +3877,14 @@ protected:
     STDIOReadThreadBytesReceived (void *baton, const void *src, size_t src_len);
     
     void
-    PushProcessInputReader ();
+    PushProcessIOHandler ();
     
     void 
-    PopProcessInputReader ();
+    PopProcessIOHandler ();
     
     void
-    ResetProcessInputReader ();
-    
-    static size_t
-    ProcessInputReaderCallback (void *baton,
-                                InputReader &reader,
-                                lldb::InputReaderAction notification,
-                                const char *bytes,
-                                size_t bytes_len);
-    
+    ResetProcessIOHandler ();
+        
     Error
     HaltForDestroyOrDetach(lldb::EventSP &exit_event_sp);
     

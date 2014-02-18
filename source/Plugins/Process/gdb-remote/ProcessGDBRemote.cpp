@@ -34,7 +34,6 @@
 #include "lldb/Core/Debugger.h"
 #include "lldb/Core/ConnectionFileDescriptor.h"
 #include "lldb/Host/FileSpec.h"
-#include "lldb/Core/InputReader.h"
 #include "lldb/Core/Module.h"
 #include "lldb/Core/ModuleSpec.h"
 #include "lldb/Core/PluginManager.h"
@@ -1073,27 +1072,6 @@ ProcessGDBRemote::DoAttachToProcessWithID (lldb::pid_t attach_pid, const Process
     return error;
 }
 
-size_t
-ProcessGDBRemote::AttachInputReaderCallback
-(
-    void *baton, 
-    InputReader *reader, 
-    lldb::InputReaderAction notification,
-    const char *bytes, 
-    size_t bytes_len
-)
-{
-    if (notification == eInputReaderGotToken)
-    {
-        ProcessGDBRemote *gdb_process = (ProcessGDBRemote *)baton;
-        if (gdb_process->m_waiting_for_attach)
-            gdb_process->m_waiting_for_attach = false;
-        reader->SetIsDone(true);
-        return 1;
-    }
-    return 0;
-}
-
 Error
 ProcessGDBRemote::DoAttachToProcessWithName (const char *process_name, const ProcessAttachInfo &attach_info)
 {
@@ -1192,7 +1170,11 @@ ProcessGDBRemote::DoResume ()
         bool continue_packet_error = false;
         if (m_gdb_comm.HasAnyVContSupport ())
         {
-            if (m_continue_c_tids.size() == num_threads)
+            if (m_continue_c_tids.size() == num_threads ||
+                (m_continue_c_tids.empty() &&
+                 m_continue_C_tids.empty() &&
+                 m_continue_s_tids.empty() &&
+                 m_continue_S_tids.empty()))
             {
                 // All threads are continuing, just send a "c" packet
                 continue_packet.PutCString ("c");

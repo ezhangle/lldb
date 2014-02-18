@@ -2096,11 +2096,10 @@ ProcessMonitor::DoOperation(Operation *op)
     sem_post(&m_operation_pending);
 
     // wait for operation to complete
-WAIT_AGAIN:
-    if (sem_wait(&m_operation_done))
+    while (sem_wait(&m_operation_done))
     {
         if (errno == EINTR)
-            goto WAIT_AGAIN;
+            continue;
         assert(false && "Unexpected errno from sem_wait");
     }
 }

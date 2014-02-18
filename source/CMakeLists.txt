@@ -152,7 +152,6 @@ set( LLVM_LINK_COMPONENTS
   ${LLVM_TARGETS_TO_BUILD}
   jit
   interpreter
-  nativecodegen
   asmparser
   bitreader
   bitwriter

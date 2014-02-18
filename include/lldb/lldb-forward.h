@@ -82,6 +82,7 @@ class   Disassembler;
 struct  DumpValueObjectOptions;
 class   DynamicLibrary;
 class   DynamicLoader;
+class   Editline;
 class   EmulateInstruction;
 class   Error;
 class   EvaluateExpressionOptions;
@@ -102,9 +103,9 @@ class   FuncUnwinders;
 class   Function;
 class   FunctionInfo;
 class   InlineFunctionInfo;
-class   InputReader;
 class   Instruction;
 class   InstructionList;
+class   IOHandler;
 class   IRExecutionUnit;
 class   JITLoader;
 class   LanguageRuntime;
@@ -303,8 +304,8 @@ namespace lldb {
     typedef std::shared_ptr<lldb_private::Function> FunctionSP;
     typedef std::shared_ptr<lldb_private::FuncUnwinders> FuncUnwindersSP;
     typedef std::shared_ptr<lldb_private::InlineFunctionInfo> InlineFunctionInfoSP;
-    typedef std::shared_ptr<lldb_private::InputReader> InputReaderSP;
     typedef std::shared_ptr<lldb_private::Instruction> InstructionSP;
+    typedef std::shared_ptr<lldb_private::IOHandler> IOHandlerSP;
     typedef std::shared_ptr<lldb_private::LanguageRuntime> LanguageRuntimeSP;
     typedef std::shared_ptr<lldb_private::SystemRuntime> SystemRuntimeSP;
     typedef std::shared_ptr<lldb_private::LineTable> LineTableSP;
@@ -359,6 +360,7 @@ namespace lldb {
     typedef std::shared_ptr<lldb_private::StoppointLocation> StoppointLocationSP;
     typedef std::shared_ptr<lldb_private::Stream> StreamSP;
     typedef std::weak_ptr<lldb_private::Stream> StreamWP;
+    typedef std::shared_ptr<lldb_private::StreamFile> StreamFileSP;
     typedef std::shared_ptr<lldb_private::StringSummaryFormat> StringTypeSummaryImplSP;
     typedef std::shared_ptr<lldb_private::SymbolFile> SymbolFileSP;
     typedef std::shared_ptr<lldb_private::SymbolFileType> SymbolFileTypeSP;
@@ -383,6 +385,7 @@ namespace lldb {
 #ifndef LLDB_DISABLE_PYTHON
     typedef std::shared_ptr<lldb_private::ScriptedSyntheticChildren> ScriptedSyntheticChildrenSP;
 #endif
+    typedef std::shared_ptr<lldb_private::UnwindAssembly> UnwindAssemblySP;
     typedef std::shared_ptr<lldb_private::UnwindPlan> UnwindPlanSP;
     typedef lldb_private::SharingPtr<lldb_private::ValueObject> ValueObjectSP;
     typedef std::shared_ptr<lldb_private::Value> ValueSP;

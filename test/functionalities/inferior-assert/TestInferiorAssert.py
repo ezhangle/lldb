@@ -35,6 +35,8 @@ class AssertingInferiorTestCase(TestBase):
         self.inferior_asserting_registers()
 
     @expectedFailurei386 # llvm.org/pr17384: lldb needs to be aware of linux-vdso.so to unwind stacks properly
+    @expectedFailureFreeBSD('llvm.org/pr18533') # PC in __assert frame is outside of function
+    @expectedFailureLinux('') # PC in __GI___assert_fail frame is just after the function (this is a no-return so there is no epilogue afterwards)
     def test_inferior_asserting_disassemble(self):
         """Test that lldb reliably disassembles frames after asserting (command)."""
         self.buildDefault()

@@ -29,9 +29,7 @@ add_lldb_library(lldbCore
   FileLineResolver.cpp
   FileSpecList.cpp
   History.cpp
-  InputReader.cpp
-  InputReaderEZ.cpp
-  InputReaderStack.cpp
+  IOHandler.cpp
   JITLoader.cpp
   Language.cpp
   Listener.cpp

@@ -978,14 +978,14 @@ ValueObject::GetPointeeData (DataExtractor& data,
             ValueObjectSP pointee_sp = Dereference(error);
             if (error.Fail() || pointee_sp.get() == NULL)
                 return 0;
-            return pointee_sp->GetDataExtractor().Copy(data);
+            return pointee_sp->GetData(data);
         }
         else
         {
             ValueObjectSP child_sp = GetChildAtIndex(0, true);
             if (child_sp.get() == NULL)
                 return 0;
-            return child_sp->GetDataExtractor().Copy(data);
+            return child_sp->GetData(data);
         }
         return true;
     }
@@ -3713,7 +3713,8 @@ ValueObject::EvaluationPoint::SyncWithProcessState()
 {
 
     // Start with the target, if it is NULL, then we're obviously not going to get any further:
-    ExecutionContext exe_ctx(m_exe_ctx_ref.Lock());
+    const bool thread_and_frame_only_if_stopped = true;
+    ExecutionContext exe_ctx(m_exe_ctx_ref.Lock(thread_and_frame_only_if_stopped));
     
     if (exe_ctx.GetTargetPtr() == NULL)
         return false;

@@ -150,7 +150,7 @@ ifeq ($(HOST_OS), $(filter $(HOST_OS), Linux GNU GNU/kFreeBSD))
     # Don't allow unresolved symbols.
     LLVMLibsOptions += -Wl,--no-undefined
     # Link in python
-    LLVMLibsOptions += $(PYTHON_BUILD_FLAGS) -lrt
+    LLVMLibsOptions += $(PYTHON_BUILD_FLAGS) -lrt -ledit -lncurses -lpanel
     LLVMLibsOptions += -Wl,--soname,lib$(LIBRARYNAME)$(SHLIBEXT)
 endif
 
@@ -161,5 +161,6 @@ ifeq ($(HOST_OS),FreeBSD)
     # Allow unresolved symbols.
     LLVMLibsOptions += -Wl,--allow-shlib-undefined
     # Link in python
-    LLVMLibsOptions += $(PYTHON_BUILD_FLAGS) -lrt -L/usr/local/lib -lexecinfo
+    LLVMLibsOptions += $(PYTHON_BUILD_FLAGS) -lrt -L/usr/local/lib -lexecinfo \
+                       -ledit -lncurses -lpanel
 endif
