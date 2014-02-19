@@ -28,7 +28,7 @@ JITLoader::LoadPlugins (Process *process, std::vector<std::unique_ptr<JITLoader>
 }
 
 JITLoader::JITLoader(Process *process) :
-    CodeLoader (process)
+    m_process (process)
 {
 }
 

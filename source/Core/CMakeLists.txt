@@ -9,7 +9,6 @@ add_lldb_library(lldbCore
   ArchSpec.cpp
   Baton.cpp
   Broadcaster.cpp
-  CodeLoader.cpp
   Communication.cpp
   Connection.cpp
   ConnectionFileDescriptor.cpp

@@ -12,7 +12,7 @@
 
 #include <vector>
 
-#include "lldb/Target/CodeLoader.h"
+#include "lldb/Core/PluginInterface.h"
 
 namespace lldb_private {
 
@@ -27,7 +27,7 @@ namespace lldb_private {
 /// there is at most one DynamicLoader. 
 //----------------------------------------------------------------------
 class JITLoader :
-    public CodeLoader
+    public PluginInterface
 {
 public:
     //------------------------------------------------------------------
@@ -49,10 +49,32 @@ public:
     //------------------------------------------------------------------
     JITLoader (Process *process);
 
-
     virtual 
     ~JITLoader ();
 
+    //------------------------------------------------------------------
+    /// Called after attaching a process.
+    ///
+    /// Allow DynamicLoader plug-ins to execute some code after
+    /// attaching to a process.
+    //------------------------------------------------------------------
+    virtual void
+    DidAttach () = 0;
+
+    //------------------------------------------------------------------
+    /// Called after launching a process.
+    ///
+    /// Allow DynamicLoader plug-ins to execute some code after
+    /// the process has stopped for the first time on launch.
+    //------------------------------------------------------------------
+    virtual void
+    DidLaunch () = 0;
+
+protected:
+    //------------------------------------------------------------------
+    // Member variables.
+    //------------------------------------------------------------------
+    Process* m_process;
 };
 
 } // namespace lldb_private

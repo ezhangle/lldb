@@ -51,7 +51,7 @@ DynamicLoader::FindPlugin (Process *process, const char *plugin_name)
 // DynamicLoader constructor
 //----------------------------------------------------------------------
 DynamicLoader::DynamicLoader(Process *process) :
-    CodeLoader (process)
+    m_process (process)
 {
 }
 

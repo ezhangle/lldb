@@ -202,7 +202,7 @@ JITLoaderGDB::ReadJITDescriptor(bool init) {
             {
                 bool changed;
                 m_jit_objects.insert(std::pair<lldb::addr_t,const lldb::ModuleSP>(symbolfile_addr,module_sp));
-                module_sp->SetLoadAddress(target, 0, changed);
+                module_sp->SetLoadAddress(target, 0, true, changed);
                 images.AppendIfNeeded(module_sp);
 
                 ModuleList module_list;
