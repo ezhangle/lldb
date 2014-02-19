@@ -63,13 +63,7 @@ public:
     virtual void
     DidLaunch ();
 
-protected:
-    void
-    Clear (bool clear_process);
-
-
 private:
-
     void
     SetJITBreakpoint();
 
@@ -82,7 +76,6 @@ private:
                           lldb::user_id_t break_id,
                           lldb::user_id_t break_loc_id);
 
-private:
     typedef std::map<lldb::addr_t, const lldb::ModuleSP> JITObjectMap;
     // A collection of in-memory jitted object addresses and their corresponding modules
     JITObjectMap m_jit_objects;

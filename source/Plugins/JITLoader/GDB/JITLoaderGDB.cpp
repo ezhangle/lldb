@@ -36,7 +36,9 @@ JITLoaderGDB::JITLoaderGDB (lldb_private::Process *process) :
 
 JITLoaderGDB::~JITLoaderGDB ()
 {
-    Clear(true);
+    if (LLDB_BREAK_ID_IS_VALID(m_jit_break_id))
+        m_process->GetTarget().RemoveBreakpointByID (m_jit_break_id);
+    m_jit_break_id = LLDB_INVALID_BREAK_ID;
 }
 
 void JITLoaderGDB::DidAttach() 
@@ -48,18 +50,6 @@ void JITLoaderGDB::DidAttach()
 void JITLoaderGDB::DidLaunch() 
 {
     SetJITBreakpoint();
-}
-
-void
-JITLoaderGDB::Clear (bool clear_process)
-{
-    if (m_process->IsAlive() && LLDB_BREAK_ID_IS_VALID(m_jit_break_id))
-        m_process->GetTarget().RemoveBreakpointByID (m_jit_break_id);
-
-    m_jit_break_id = LLDB_INVALID_BREAK_ID;
-
-    if (clear_process)
-        m_process = NULL;
 }
 
 //------------------------------------------------------------------
