@@ -73,6 +73,7 @@
 
 #if defined (__linux__)
 #include "Plugins/Process/Linux/ProcessLinux.h"
+#include "Plugins/JITLoader/GDB/JITLoaderGDB.h"
 #endif
 
 #if defined (__FreeBSD__)
@@ -83,7 +84,6 @@
 #include "Plugins/Platform/gdb-server/PlatformRemoteGDBServer.h"
 #include "Plugins/Process/gdb-remote/ProcessGDBRemote.h"
 #include "Plugins/DynamicLoader/Static/DynamicLoaderStatic.h"
-#include "Plugins/JITLoader/GDB/JITLoaderGDB.h"
 
 using namespace lldb;
 using namespace lldb_private;
@@ -160,6 +160,7 @@ lldb_private::Initialize ()
 
 #if defined(__linux__) || defined(__FreeBSD__)
         ProcessElfCore::Initialize();
+        JITLoaderGDB::Initialize();
 #endif
         //----------------------------------------------------------------------
         // Platform agnostic plugins
@@ -167,7 +168,6 @@ lldb_private::Initialize ()
         PlatformRemoteGDBServer::Initialize ();
         ProcessGDBRemote::Initialize();
         DynamicLoaderStatic::Initialize();
-        JITLoaderGDB::Initialize();
 
         // Scan for any system or user LLDB plug-ins
         PluginManager::Initialize();
@@ -236,6 +236,7 @@ lldb_private::Terminate ()
 
 #if defined (__linux__)
     ProcessLinux::Terminate();
+    JITLoaderGDB::Terminate();
 #endif
 
 #if defined (__FreeBSD__)
@@ -247,7 +248,6 @@ lldb_private::Terminate ()
 #endif
     ProcessGDBRemote::Terminate();
     DynamicLoaderStatic::Terminate();
-    JITLoaderGDB::Terminate();
 
     Log::Terminate();
 }

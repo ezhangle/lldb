@@ -17,7 +17,7 @@
 #include <string>
 
 #include "lldb/Target/JITLoader.h"
-
+#include "lldb/Target/Process.h"
 
 class JITLoaderGDB : public lldb_private::JITLoader
 {
@@ -64,11 +64,18 @@ public:
     DidLaunch ();
 
 private:
+    lldb::addr_t
+    GetSymbolAddress(const lldb_private::ConstString &name,
+                     lldb::SymbolType symbol_type) const;
+
     void
     SetJITBreakpoint();
 
     bool
-    ReadJITDescriptor(bool init = false);
+    DidSetJITBreakpoint() const;
+
+    bool
+    ReadJITDescriptor(bool all_entries);
 
     static bool
     JITDebugBreakpointHit(void *baton,
@@ -76,10 +83,17 @@ private:
                           lldb::user_id_t break_id,
                           lldb::user_id_t break_loc_id);
 
-    typedef std::map<lldb::addr_t, const lldb::ModuleSP> JITObjectMap;
+    static void
+    ProcessStateChangedCallback(void *baton,
+                                lldb_private::Process *process,
+                                lldb::StateType state);
+
     // A collection of in-memory jitted object addresses and their corresponding modules
+    typedef std::map<lldb::addr_t, const lldb::ModuleSP> JITObjectMap;
     JITObjectMap m_jit_objects;
+
     lldb::user_id_t m_jit_break_id;
+    lldb_private::Process::Notifications m_notification_callbacks;
 
 };
 

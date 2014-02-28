@@ -45,6 +45,9 @@ flags = [
 '-Iinclude',
 '-I../../include',
 '-I../clang/include',
+'-I/build/build-llvm/include/',
+'-I/build/build-llvm/tools/clang/include/',
+'-I/build/build-llvm/tools/lldb/include/',
 ]
 
 # Set this to the absolute path to the folder (NOT the file!) containing the
