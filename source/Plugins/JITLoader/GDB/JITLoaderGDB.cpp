@@ -162,12 +162,14 @@ JITLoaderGDB::ReadJITDescriptor(bool all_entries)
 
     jit_actions_t jit_action = (jit_actions_t)jit_desc.action_flag;
     addr_t jit_relevant_entry = (addr_t)jit_desc.relevant_entry;
-    if (all_entries) {
+    if (all_entries)
+    {
         jit_action = JIT_REGISTER_FN;
         jit_relevant_entry = (addr_t)jit_desc.first_entry;
     }
 
-    while (jit_relevant_entry != 0) {
+    while (jit_relevant_entry != 0)
+    {
         jit_code_entry jit_entry;
         const size_t jit_entry_size = sizeof(jit_entry);
         bytes_read = m_process->DoReadMemory(jit_relevant_entry, &jit_entry, jit_entry_size, error);
@@ -192,10 +194,12 @@ JITLoaderGDB::ReadJITDescriptor(bool all_entries)
                     " (%" PRIu64 " bytes)",
                     __FUNCTION__, symbolfile_addr, symbolfile_size);
 
+            char jit_name[64];
+            snprintf(jit_name, 64, "JIT(0x%" PRIx64 ")", symbolfile_addr);
             module_sp = m_process->ReadModuleFromMemory(
-                FileSpec("JIT", false), symbolfile_addr, symbolfile_size);
+                FileSpec(jit_name, false), symbolfile_addr, symbolfile_size);
 
-            if (module_sp)
+            if (module_sp && module_sp->GetObjectFile())
             {
                 bool changed;
                 m_jit_objects.insert(
