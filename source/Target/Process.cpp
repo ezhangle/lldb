@@ -4824,7 +4824,16 @@ public:
                             // Consume the interrupt byte
                             n = 1;
                             m_pipe_read.Read (&ch, n);
-                            SetIsDone(true);
+                            switch (ch)
+                            {
+                                case 'q':
+                                    SetIsDone(true);
+                                    break;
+                                case 'i':
+                                    if (StateIsRunningState(m_process->GetState()))
+                                        m_process->Halt();
+                                    break;
+                            }
                         }
                     }
                 }
@@ -4855,12 +4864,33 @@ public:
     {
         
     }
+    
+    virtual void
+    Cancel ()
+    {
+        size_t n = 1;
+        char ch = 'q';  // Send 'q' for quit
+        m_pipe_write.Write (&ch, n);
+    }
+
     virtual void
     Interrupt ()
     {
+#ifdef _MSC_VER
+        // Windows doesn't support pipes, so we will send an async interrupt
+        // event to stop the process
+        if (StateIsRunningState(m_process->GetState()))
+            m_process->SendAsyncInterrupt();
+#else
+        // Do only things that are safe to do in an interrupt context (like in
+        // a SIGINT handler), like write 1 byte to a file descriptor. This will
+        // interrupt the IOHandlerProcessSTDIO::Run() and we can look at the byte
+        // that was written to the pipe and then call m_process->Halt() from a
+        // much safer location in code.
         size_t n = 1;
-        char ch = 'q';
+        char ch = 'i'; // Send 'i' for interrupt
         m_pipe_write.Write (&ch, n);
+#endif
     }
     
     virtual void
@@ -4890,7 +4920,7 @@ Process::CancelWatchForSTDIN (bool exited)
     {
         if (exited)
             m_process_input_reader->SetIsDone(true);
-        m_process_input_reader->Interrupt();
+        m_process_input_reader->Cancel();
     }
 }
 
@@ -4934,7 +4964,7 @@ Process::PopProcessIOHandler ()
     IOHandlerSP io_handler_sp (m_process_input_reader);
     if (io_handler_sp)
     {
-        io_handler_sp->Interrupt();
+        io_handler_sp->Cancel();
         m_target.GetDebugger().PopIOHandler (io_handler_sp);
     }
 }
@@ -5119,7 +5149,12 @@ Process::RunThreadPlan (ExecutionContext &exe_ctx,
         TimeValue final_timeout = one_thread_timeout;
         
         uint32_t timeout_usec = options.GetTimeoutUsec();
-        if (options.GetTryAllThreads())
+        if (!options.GetStopOthers())
+        {
+            before_first_timeout = false;
+            final_timeout.OffsetWithMicroSeconds(timeout_usec);
+        }
+        else if (options.GetTryAllThreads())
         {
             // If we are running all threads then we take half the time to run all threads, bounded by
             // .25 sec.

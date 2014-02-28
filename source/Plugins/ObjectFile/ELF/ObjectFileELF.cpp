@@ -546,7 +546,6 @@ ObjectFileELF::SetLoadAddress (Target &target,
                                lldb::addr_t value,
                                bool value_is_offset)
 {
-    bool changed = false;
     ModuleSP module_sp = GetModule();
     if (module_sp)
     {
@@ -558,7 +557,7 @@ ObjectFileELF::SetLoadAddress (Target &target,
             {
                 const size_t num_sections = section_list->GetSize();
                 size_t sect_idx = 0;
-                
+
                 for (sect_idx = 0; sect_idx < num_sections; ++sect_idx)
                 {
                     // Iterate through the object file sections to find all
@@ -571,7 +570,6 @@ ObjectFileELF::SetLoadAddress (Target &target,
                             ++num_loaded_sections;
                     }
                 }
-                changed = num_loaded_sections > 0;
                 return num_loaded_sections > 0;
             }
             else
@@ -581,7 +579,7 @@ ObjectFileELF::SetLoadAddress (Target &target,
             }
         }
     }
-    return changed;
+    return false; // If it changed
 }
 
 ByteOrder

@@ -588,6 +588,13 @@ IOHandlerEditline::Refresh ()
 }
 
 void
+IOHandlerEditline::Cancel ()
+{
+    if (m_editline_ap)
+        m_editline_ap->Interrupt ();
+}
+
+void
 IOHandlerEditline::Interrupt ()
 {
     if (m_editline_ap)
@@ -2106,13 +2113,11 @@ type summary add -s "${var.origin%S} ${var.size%S}" curses::Rect
                     
                 default:
                 {
-                    bool handled = false;
                     for (size_t i=0; i<num_submenus; ++i)
                     {
                         Menu *menu = submenus[i].get();
                         if (menu->GetKeyValue() == key)
                         {
-                            handled = true;
                             SetSelectedSubmenuIndex(i);
                             window.GetParent()->RemoveSubWindow(&window);
                             if (menu->Action() == MenuActionResult::Quit)
@@ -5279,6 +5284,10 @@ IOHandlerCursesGUI::Refresh ()
 {
 }
 
+void
+IOHandlerCursesGUI::Cancel ()
+{
+}
 
 void
 IOHandlerCursesGUI::Interrupt ()
