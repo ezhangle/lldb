@@ -1463,7 +1463,6 @@ public:
                 // (symbols that start with the letter 'l' or 'L'.
                 return m_section_infos[n_sect].section_sp;
             }
-            return m_section_infos[n_sect].section_sp;
         }
         return m_section_list->FindSectionContainingFileAddress(file_addr);
     }
@@ -1617,21 +1616,6 @@ ParseTrieEntries (DataExtractor &data,
 	}
 }
 
-void ObjectFileMachO::LoadFromInternalDataOrProcesss(DataExtractor &target, uint32_t offset, uint32_t length, ProcessSP proc)
-{
-    if (!proc || (offset + length < m_data.GetByteSize()))
-    {
-        target.SetData (m_data,
-        offset,
-        length);
-    } else {
-        DataBufferSP data_sp (ReadMemory (proc, 
-            m_memory_addr + offset, length));
-        if (data_sp)
-            target.SetData (data_sp, 0, data_sp->GetByteSize());     
-    }
-}
-
 size_t
 ObjectFileMachO::ParseSymtab ()
 {
@@ -1770,7 +1754,6 @@ ObjectFileMachO::ParseSymtab ()
         
         uint32_t memory_module_load_level = eMemoryModuleLoadLevelComplete;
 
-        bool data_was_read = false;
         if (process)
         {
             Target &target = process->GetTarget();
@@ -1782,12 +1765,12 @@ ObjectFileMachO::ParseSymtab ()
 
             if (linkedit_section_sp)
             {
-                if (log)
-                    log->Printf("In Linkedit!");
                 const addr_t linkedit_load_addr = linkedit_section_sp->GetLoadBaseAddress(&target);
                 const addr_t linkedit_file_offset = linkedit_section_sp->GetFileOffset();
                 const addr_t symoff_addr = linkedit_load_addr + symtab_load_command.symoff - linkedit_file_offset;
                 strtab_addr = linkedit_load_addr + symtab_load_command.stroff - linkedit_file_offset;
+
+                bool data_was_read = false;
 
 #if defined (__APPLE__) && defined (__arm__)
                 if (m_header.flags & 0x80000000u)
@@ -1836,7 +1819,6 @@ ObjectFileMachO::ParseSymtab ()
 
                 if (!data_was_read)
                 {
-                    data_was_read = true;
                     if (memory_module_load_level == eMemoryModuleLoadLevelComplete)
                     {
                         DataBufferSP nlist_data_sp (ReadMemory (process_sp, symoff_addr, nlist_data_byte_size));
@@ -1869,27 +1851,34 @@ ObjectFileMachO::ParseSymtab ()
                 }
             }
         }
-        
-        if (!data_was_read)
+        else
         {
-            LoadFromInternalDataOrProcesss(nlist_data,
-                                            symtab_load_command.symoff,
-                                            nlist_data_byte_size,process_sp);
-            LoadFromInternalDataOrProcesss(strtab_data,
-                                            symtab_load_command.stroff,
-                                            strtab_data_byte_size,process_sp);
+            nlist_data.SetData (m_data,
+                                symtab_load_command.symoff,
+                                nlist_data_byte_size);
+            strtab_data.SetData (m_data,
+                                 symtab_load_command.stroff,
+                                 strtab_data_byte_size);
+            
             if (dyld_info.export_size > 0)
-                LoadFromInternalDataOrProcesss(dyld_trie_data,
-                                                dyld_info.export_off,
-                                                dyld_info.export_size,process_sp);
+            {
+                dyld_trie_data.SetData (m_data,
+                                        dyld_info.export_off,
+                                        dyld_info.export_size);
+            }
+
             if (m_dysymtab.nindirectsyms != 0)
-                LoadFromInternalDataOrProcesss(indirect_symbol_index_data,
-                                                m_dysymtab.indirectsymoff,
-                                                m_dysymtab.nindirectsyms * 4,process_sp);
+            {
+                indirect_symbol_index_data.SetData (m_data,
+                                                    m_dysymtab.indirectsymoff,
+                                                    m_dysymtab.nindirectsyms * 4);
+            }
             if (function_starts_load_command.cmd)
-                LoadFromInternalDataOrProcesss(function_starts_data,
-                                                function_starts_load_command.dataoff,
-                                                function_starts_load_command.datasize,process_sp);
+            {
+                function_starts_data.SetData (m_data,
+                                              function_starts_load_command.dataoff,
+                                              function_starts_load_command.datasize);
+            }
         }
 
         if (nlist_data.GetByteSize() == 0 && memory_module_load_level == eMemoryModuleLoadLevelComplete)
@@ -1947,8 +1936,6 @@ ObjectFileMachO::ParseSymtab ()
 
         if (text_section_sp && function_starts_data.GetByteSize())
         {
-            if(log)
-                log->Printf("Using function_starts_data");
             FunctionStarts::Entry function_start_entry;
             function_start_entry.data = false;
             lldb::offset_t function_start_offset = 0;
@@ -1974,8 +1961,6 @@ ObjectFileMachO::ParseSymtab ()
                 eh_frame.GetFunctionAddressAndSizeVector (functions);
                 addr_t text_base_addr = text_section_sp->GetFileAddress();
                 size_t count = functions.GetSize();
-                if(log)
-                    log->Printf("%d Functions in eh_frame",count);
                 for (size_t i = 0; i < count; ++i)
                 {
                     const DWARFCallFrameInfo::FunctionAddressAndSizeVector::Entry *func = functions.GetEntryAtIndex (i);
@@ -1984,9 +1969,6 @@ ObjectFileMachO::ParseSymtab ()
                         FunctionStarts::Entry function_start_entry;
                         function_start_entry.addr = func->base - text_base_addr;
                         function_starts.Append(function_start_entry);
-                    } else {
-                        if(log)
-                            log->Printf("Skipping function");
                     }
                 }
             }
@@ -3433,8 +3415,6 @@ ObjectFileMachO::ParseSymtab ()
                             if (!symbol_section)
                             {
                                 // TODO: warn about this?
-                                if (log)
-                                    log->Printf("Warn about this!");
                                 add_nlist = false;
                                 break;
                             }
@@ -3781,8 +3761,6 @@ ObjectFileMachO::ParseSymtab ()
                         Address symbol_addr;
                         if (module_sp->ResolveFileAddress (symbol_file_addr, symbol_addr))
                         {
-                            if (log)
-                                log->Printf("Successfully resolved file address!");
                             SectionSP symbol_section (symbol_addr.GetSection());
                             uint32_t symbol_byte_size = 0;
                             if (symbol_section)
@@ -3817,9 +3795,6 @@ ObjectFileMachO::ParseSymtab ()
                                     sym[sym_idx].SetByteSize (symbol_byte_size);
                                 ++sym_idx;
                             }
-                        } else {
-                            if (log)
-                                log->Printf("Unable to Resolve File Address");
                         }
                     }
                 }

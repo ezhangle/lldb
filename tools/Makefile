@@ -28,8 +28,4 @@ ifeq ($(HOST_OS),Darwin)
 DIRS += debugserver
 endif
 
-ifeq ($(HOST_OS),Darwin)
-DIRS += debugserver
-endif
-
 include $(LLDB_LEVEL)/Makefile

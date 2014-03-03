@@ -23,7 +23,6 @@
 #include "lldb/Target/Target.h"
 #include "lldb/Target/Thread.h"
 
-#include "llvm/Support/TargetSelect.h"
 #include "llvm/ADT/StringRef.h"
 
 #include "Plugins/ABI/MacOSX-i386/ABIMacOSX_i386.h"
@@ -102,8 +101,6 @@ lldb_private::Initialize ()
         Log::Initialize();
         Timer::Initialize ();
         Timer scoped_timer (__PRETTY_FUNCTION__, __PRETTY_FUNCTION__);
-
-        llvm::InitializeNativeTarget();
         
         ABIMacOSX_i386::Initialize();
         ABIMacOSX_arm::Initialize();
@@ -153,6 +150,7 @@ lldb_private::Initialize ()
         // Linux hosted plugins
         //----------------------------------------------------------------------
         ProcessLinux::Initialize();
+        JITLoaderGDB::Initialize();
 #endif
 #if defined (__FreeBSD__)
         ProcessFreeBSD::Initialize();
@@ -160,7 +158,6 @@ lldb_private::Initialize ()
 
 #if defined(__linux__) || defined(__FreeBSD__)
         ProcessElfCore::Initialize();
-        JITLoaderGDB::Initialize();
 #endif
         //----------------------------------------------------------------------
         // Platform agnostic plugins

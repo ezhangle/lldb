@@ -23,10 +23,34 @@
 
 #include "JITLoaderGDB.h"
 
-#include "../../SymbolFile/DWARF/SymbolFileDWARF.h"
-
 using namespace lldb;
 using namespace lldb_private;
+
+//------------------------------------------------------------------
+// Debug Interface Structures
+//------------------------------------------------------------------
+typedef enum
+{
+    JIT_NOACTION = 0,
+    JIT_REGISTER_FN,
+    JIT_UNREGISTER_FN
+} jit_actions_t;
+
+struct jit_code_entry
+{
+    struct jit_code_entry *next_entry;
+    struct jit_code_entry *prev_entry;
+    const char *symfile_addr;
+    uint64_t symfile_size;
+};
+
+struct jit_descriptor
+{
+    uint32_t version;
+    uint32_t action_flag; // Values are jit_action_t
+    struct jit_code_entry *relevant_entry;
+    struct jit_code_entry *first_entry;
+};
 
 JITLoaderGDB::JITLoaderGDB (lldb_private::Process *process) :
     JITLoader(process),
@@ -56,32 +80,6 @@ void JITLoaderGDB::DidLaunch()
 {
     SetJITBreakpoint();
 }
-
-//------------------------------------------------------------------
-// Debug Interface Structures
-//------------------------------------------------------------------
-typedef enum
-{
-    JIT_NOACTION = 0,
-    JIT_REGISTER_FN,
-    JIT_UNREGISTER_FN
-} jit_actions_t;
-
-struct jit_code_entry
-{
-    struct jit_code_entry *next_entry;
-    struct jit_code_entry *prev_entry;
-    const char *symfile_addr;
-    uint64_t symfile_size;
-};
-
-struct jit_descriptor
-{
-    uint32_t version;
-    uint32_t action_flag; // Values are jit_action_t
-    struct jit_code_entry *relevant_entry;
-    struct jit_code_entry *first_entry;
-};
 
 //------------------------------------------------------------------
 // Setup the JIT Breakpoint
@@ -372,7 +370,6 @@ JITLoaderGDB::GetSymbolAddress(const ConstString &name, SymbolType symbol_type) 
     if (!images.FindSymbolsWithNameAndType(name, symbol_type, target_symbols))
         return LLDB_INVALID_ADDRESS;
 
-    // TODO handle case where more than one symbol found
     SymbolContext sym_ctx;
     target_symbols.GetContextAtIndex(0, sym_ctx);
 

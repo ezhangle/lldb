@@ -72,8 +72,7 @@ USEDLIBS = lldbAPI.a \
 	lldbPluginPlatformLinux.a \
 	lldbPluginPlatformWindows.a \
 	lldbPluginPlatformFreeBSD.a \
-	lldbPluginPlatformPOSIX.a \
-	lldbPluginJITLoaderGDB.a
+	lldbPluginPlatformPOSIX.a
 
 # Because GCC requires RTTI enabled for lldbCore (see source/Core/Makefile) it is
 # necessary to also link the clang rewriter libraries so vtable references can
@@ -106,7 +105,8 @@ ifeq ($(HOST_OS),Linux)
               lldbPluginProcessLinux.a \
               lldbPluginProcessPOSIX.a \
               lldbPluginDynamicLoaderMacOSX.a \
-              lldbPluginProcessElfCore.a
+              lldbPluginProcessElfCore.a \
+              lldbPluginJITLoaderGDB.a
 endif
 
 ifneq (,$(filter $(HOST_OS), FreeBSD GNU/kFreeBSD))

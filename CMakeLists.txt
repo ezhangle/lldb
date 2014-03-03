@@ -136,7 +136,7 @@ endif()
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
     AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER "3.3")
   add_lldb_definitions(
-    -Wno-deprecated # Suppress "deprecated register keyword" warnings
+    -Wno-deprecated-register # Suppress "deprecated register keyword" warnings
   )
 endif()
 

@@ -67,7 +67,7 @@ endif
 #   http://gcc.gnu.org/PR41838
 #
 # We can revisit this when LLVM/Clang support it.
-CXX.Flags += -fno-strict-aliasing -std=c++11
+CXX.Flags += -fno-strict-aliasing
 
 # Do not warn about pragmas.  In particular, we are looking to ignore the
 # "#pragma mark" construct which GCC warns about on platforms other than Darwin.

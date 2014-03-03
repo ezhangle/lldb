@@ -213,9 +213,6 @@ protected:
     size_t
     ParseSymtab ();
 
-private: 
-    void LoadFromInternalDataOrProcesss(lldb_private::DataExtractor &target, uint32_t offset, uint32_t length, lldb::ProcessSP proc);
-
 };
 
 #endif  // liblldb_ObjectFileMachO_h_
