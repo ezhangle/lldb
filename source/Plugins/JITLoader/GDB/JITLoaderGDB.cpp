@@ -206,10 +206,11 @@ JITLoaderGDB::ReadJITDescriptor(bool all_entries)
                     std::pair<lldb::addr_t, const lldb::ModuleSP>(
                         symbolfile_addr, module_sp));
                 module_sp->SetLoadAddress(target, 0, true, changed);
-                images.AppendIfNeeded(module_sp);
 
                 // load the symbol table right away
                 module_sp->GetObjectFile()->GetSymtab();
+
+                images.AppendIfNeeded(module_sp);
 
                 ModuleList module_list;
                 module_list.Append(module_sp);
