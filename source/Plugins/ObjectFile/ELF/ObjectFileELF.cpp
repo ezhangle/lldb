@@ -521,14 +521,13 @@ ObjectFileELF::ObjectFileELF (const lldb::ModuleSP &module_sp,
                               DataBufferSP& data_sp,
                               const lldb::ProcessSP &process_sp,
                               addr_t header_addr) :
-    ObjectFile(module_sp, process_sp, header_addr, data_sp),
+    ObjectFile(module_sp, process_sp, LLDB_INVALID_ADDRESS, data_sp),
     m_header(),
     m_program_headers(),
     m_section_headers(),
     m_filespec_ap()
 {
     ::memset(&m_header, 0, sizeof(m_header));
-    const_cast<lldb::addr_t &>(m_memory_addr) = LLDB_INVALID_ADDRESS;
 }
 
 ObjectFileELF::~ObjectFileELF()
