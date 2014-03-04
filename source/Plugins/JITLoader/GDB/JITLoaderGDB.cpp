@@ -282,10 +282,11 @@ JITLoaderGDB::GetPluginNameStatic()
     return g_name;
 }
 
-JITLoader *
+JITLoaderSP
 JITLoaderGDB::CreateInstance(Process *process, bool force)
 {
-    return new JITLoaderGDB(process);
+    JITLoaderSP jit_loader_sp(new JITLoaderGDB(process));
+    return jit_loader_sp;
 }
 
 const char *

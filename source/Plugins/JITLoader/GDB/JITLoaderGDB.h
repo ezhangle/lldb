@@ -37,7 +37,7 @@ public:
     static const char *
     GetPluginDescriptionStatic();
 
-    static lldb_private::JITLoader *
+    static lldb::JITLoaderSP
     CreateInstance (lldb_private::Process *process, bool force);
 
     JITLoaderGDB (lldb_private::Process *process);

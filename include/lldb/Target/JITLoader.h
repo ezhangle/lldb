@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "lldb/Core/PluginInterface.h"
+#include "lldb/Target/JITLoaderList.h"
 
 namespace lldb_private {
 
@@ -42,7 +43,7 @@ public:
     ///
     //------------------------------------------------------------------
     static void 
-    LoadPlugins (Process *process, std::vector<std::unique_ptr<JITLoader>> &list);
+    LoadPlugins (Process *process, lldb_private::JITLoaderList &list);
 
     //------------------------------------------------------------------
     /// Construct with a process.

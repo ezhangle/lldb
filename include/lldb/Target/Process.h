@@ -42,6 +42,7 @@
 #include "lldb/Interpreter/Args.h"
 #include "lldb/Interpreter/Options.h"
 #include "lldb/Target/ExecutionContextScope.h"
+#include "lldb/Target/JITLoaderList.h"
 #include "lldb/Target/Memory.h"
 #include "lldb/Target/QueueList.h"
 #include "lldb/Target/ThreadList.h"
@@ -1825,7 +1826,6 @@ public:
     GetDynamicLoader ();
 
 protected:
-    typedef std::vector<std::unique_ptr<JITLoader>> JITLoaderList;
     virtual JITLoaderList &
     GetJITLoaders ();
 
@@ -3775,8 +3775,7 @@ protected:
     Listener                    &m_listener;
     BreakpointSiteList          m_breakpoint_site_list; ///< This is the list of breakpoint locations we intend to insert in the target.
     std::unique_ptr<DynamicLoader> m_dyld_ap;
-    JITLoaderList m_jit_aps;
-    bool m_did_load_jit_aps;
+    std::unique_ptr<JITLoaderList> m_jit_loaders_ap;
     std::unique_ptr<DynamicCheckerFunctions> m_dynamic_checkers_ap; ///< The functions used by the expression parser to validate data that expressions use.
     std::unique_ptr<OperatingSystem> m_os_ap;
     std::unique_ptr<SystemRuntime> m_system_runtime_ap;

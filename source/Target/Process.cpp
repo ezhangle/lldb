@@ -1035,7 +1035,6 @@ Process::Process(Target &target, Listener &listener) :
     m_image_tokens (),
     m_listener (listener),
     m_breakpoint_site_list (),
-    m_did_load_jit_aps(false),
     m_dynamic_checkers_ap (),
     m_unix_signals (),
     m_abi_sp (),
@@ -1156,8 +1155,7 @@ Process::Finalize()
     m_os_ap.reset();
     m_system_runtime_ap.reset();
     m_dyld_ap.reset();
-    m_jit_aps.clear();
-    m_did_load_jit_aps = false;
+    m_jit_loaders_ap.reset();
     m_thread_list_real.Destroy();
     m_thread_list.Destroy();
     m_extended_thread_list.Destroy();
@@ -2993,8 +2991,7 @@ Process::Launch (ProcessLaunchInfo &launch_info)
     Error error;
     m_abi_sp.reset();
     m_dyld_ap.reset();
-    m_jit_aps.clear();
-    m_did_load_jit_aps = false;
+    m_jit_loaders_ap.reset();
     m_system_runtime_ap.reset();
     m_os_ap.reset();
     m_process_input_reader.reset();
@@ -3071,9 +3068,7 @@ Process::Launch (ProcessLaunchInfo &launch_info)
                         if (dyld)
                             dyld->DidLaunch();
 
-                        JITLoaderList &jits = GetJITLoaders ();
-                        for (JITLoaderList::iterator it = jits.begin(); it != jits.end(); ++it)
-                            (*it)->DidLaunch();
+                        GetJITLoaders().DidLaunch();
 
                         SystemRuntime *system_runtime = GetSystemRuntime ();
                         if (system_runtime)
@@ -3122,9 +3117,7 @@ Process::LoadCore ()
         if (dyld)
             dyld->DidAttach();
 
-        JITLoaderList &jits = GetJITLoaders ();
-        for (JITLoaderList::iterator it = jits.begin(); it != jits.end(); ++it)
-            (*it)->DidAttach();
+        GetJITLoaders().DidAttach();
         
         SystemRuntime *system_runtime = GetSystemRuntime ();
         if (system_runtime)
@@ -3148,16 +3141,17 @@ Process::GetDynamicLoader ()
     return m_dyld_ap.get();
 }
 
-std::vector<std::unique_ptr<JITLoader>> &
+JITLoaderList &
 Process::GetJITLoaders ()
 {
-    if (!m_did_load_jit_aps) {
-        JITLoader::LoadPlugins(this,m_jit_aps);
-        m_did_load_jit_aps = true;
+    if (!m_jit_loaders_ap)
+    {
+        m_jit_loaders_ap.reset(new JITLoaderList());
+        JITLoader::LoadPlugins(this, *m_jit_loaders_ap);
     }
-    return m_jit_aps;
-
+    return *m_jit_loaders_ap;
 }
+
 SystemRuntime *
 Process::GetSystemRuntime ()
 {
@@ -3228,8 +3222,7 @@ Process::Attach (ProcessAttachInfo &attach_info)
     m_abi_sp.reset();
     m_process_input_reader.reset();
     m_dyld_ap.reset();
-    m_jit_aps.clear();
-    m_did_load_jit_aps = false;
+    m_jit_loaders_ap.reset();
     m_system_runtime_ap.reset();
     m_os_ap.reset();
     
@@ -3403,9 +3396,7 @@ Process::CompleteAttach ()
     if (dyld)
         dyld->DidAttach();
 
-    JITLoaderList &jits = GetJITLoaders ();
-    for (JITLoaderList::iterator it = jits.begin(); it != jits.end(); ++it)
-        (*it)->DidAttach();
+    GetJITLoaders().DidAttach();
 
     SystemRuntime *system_runtime = GetSystemRuntime ();
     if (system_runtime)
@@ -5988,8 +5979,7 @@ Process::DidExec ()
     m_system_runtime_ap.reset();
     m_os_ap.reset();
     m_dyld_ap.reset();
-    m_jit_aps.clear();
-    m_did_load_jit_aps = false;
+    m_jit_loaders_ap.reset();
     m_image_tokens.clear();
     m_allocated_memory_cache.Clear();
     m_language_runtimes.clear();
