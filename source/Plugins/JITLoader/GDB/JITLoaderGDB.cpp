@@ -278,7 +278,7 @@ JITLoaderGDB::ReadJITDescriptor(bool all_entries)
 lldb_private::ConstString
 JITLoaderGDB::GetPluginNameStatic()
 {
-    static ConstString g_name("gdbjit");
+    static ConstString g_name("gdb");
     return g_name;
 }
 
