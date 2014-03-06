@@ -69,6 +69,7 @@ JITLoaderGDB::~JITLoaderGDB ()
     if (LLDB_BREAK_ID_IS_VALID(m_jit_break_id))
         m_process->GetTarget().RemoveBreakpointByID (m_jit_break_id);
     m_jit_break_id = LLDB_INVALID_BREAK_ID;
+    m_process->UnregisterNotificationCallbacks(m_notification_callbacks);
 }
 
 void JITLoaderGDB::DidAttach()
