@@ -29,23 +29,26 @@
 #include "Plugins/ABI/MacOSX-arm/ABIMacOSX_arm.h"
 #include "Plugins/ABI/SysV-x86_64/ABISysV_x86_64.h"
 #include "Plugins/Disassembler/llvm/DisassemblerLLVMC.h"
+#include "Plugins/DynamicLoader/POSIX-DYLD/DynamicLoaderPOSIXDYLD.h"
 #include "Plugins/Instruction/ARM/EmulateInstructionARM.h"
-#include "Plugins/SymbolVendor/MacOSX/SymbolVendorMacOSX.h"
-#include "Plugins/SymbolVendor/ELF/SymbolVendorELF.h"
+#include "Plugins/JITLoader/GDB/JITLoaderGDB.h"
+#include "Plugins/LanguageRuntime/CPlusPlus/ItaniumABI/ItaniumABILanguageRuntime.h"
 #include "Plugins/ObjectContainer/BSD-Archive/ObjectContainerBSDArchive.h"
 #include "Plugins/ObjectFile/ELF/ObjectFileELF.h"
+#include "Plugins/ObjectFile/PECOFF/ObjectFilePECOFF.h"
+#include "Plugins/Platform/FreeBSD/PlatformFreeBSD.h"
+#include "Plugins/Platform/Linux/PlatformLinux.h"
+#include "Plugins/Platform/POSIX/PlatformPOSIX.h"
+#include "Plugins/Platform/Windows/PlatformWindows.h"
+#include "Plugins/Process/elf-core/ProcessElfCore.h"
+#include "Plugins/SymbolVendor/MacOSX/SymbolVendorMacOSX.h"
+#include "Plugins/SymbolVendor/ELF/SymbolVendorELF.h"
 #include "Plugins/SymbolFile/DWARF/SymbolFileDWARF.h"
 #include "Plugins/SymbolFile/DWARF/SymbolFileDWARFDebugMap.h"
 #include "Plugins/SymbolFile/Symtab/SymbolFileSymtab.h"
 #include "Plugins/UnwindAssembly/x86/UnwindAssembly-x86.h"
 #include "Plugins/UnwindAssembly/InstEmulation/UnwindAssemblyInstEmulation.h"
-#include "Plugins/ObjectFile/PECOFF/ObjectFilePECOFF.h"
-#include "Plugins/DynamicLoader/POSIX-DYLD/DynamicLoaderPOSIXDYLD.h"
-#include "Plugins/Platform/FreeBSD/PlatformFreeBSD.h"
-#include "Plugins/Platform/Linux/PlatformLinux.h"
-#include "Plugins/Platform/POSIX/PlatformPOSIX.h"
-#include "Plugins/Platform/Windows/PlatformWindows.h"
-#include "Plugins/LanguageRuntime/CPlusPlus/ItaniumABI/ItaniumABILanguageRuntime.h"
+
 #ifndef LLDB_DISABLE_PYTHON
 #include "Plugins/OperatingSystem/Python/OperatingSystemPython.h"
 #endif
@@ -66,13 +69,9 @@
 
 #include "Plugins/Process/mach-core/ProcessMachCore.h"
 
-#if defined(__linux__) || defined(__FreeBSD__)
-#include "Plugins/Process/elf-core/ProcessElfCore.h"
-#endif
 
 #if defined (__linux__)
 #include "Plugins/Process/Linux/ProcessLinux.h"
-#include "Plugins/JITLoader/GDB/JITLoaderGDB.h"
 #endif
 
 #if defined (__FreeBSD__)
@@ -125,7 +124,11 @@ lldb_private::Initialize ()
         ScriptInterpreterPython::InitializePrivate();
         OperatingSystemPython::Initialize();
 #endif
-
+        JITLoaderGDB::Initialize();
+#if defined(__linux__) || defined(__FreeBSD__)
+        ProcessElfCore::Initialize();
+#endif
+        
 #if defined (__APPLE__)
         //----------------------------------------------------------------------
         // Apple/Darwin hosted plugins
@@ -150,15 +153,11 @@ lldb_private::Initialize ()
         // Linux hosted plugins
         //----------------------------------------------------------------------
         ProcessLinux::Initialize();
-        JITLoaderGDB::Initialize();
 #endif
 #if defined (__FreeBSD__)
         ProcessFreeBSD::Initialize();
 #endif
 
-#if defined(__linux__) || defined(__FreeBSD__)
-        ProcessElfCore::Initialize();
-#endif
         //----------------------------------------------------------------------
         // Platform agnostic plugins
         //----------------------------------------------------------------------
@@ -211,7 +210,11 @@ lldb_private::Terminate ()
 #ifndef LLDB_DISABLE_PYTHON
     OperatingSystemPython::Terminate();
 #endif
-
+    JITLoaderGDB::Terminate();
+#if defined(__linux__) || defined(__FreeBSD__)
+    ProcessElfCore::Terminate();
+#endif
+    
 #if defined (__APPLE__)
     DynamicLoaderMacOSXDYLD::Terminate();
     DynamicLoaderDarwinKernel::Terminate();
@@ -233,16 +236,12 @@ lldb_private::Terminate ()
 
 #if defined (__linux__)
     ProcessLinux::Terminate();
-    JITLoaderGDB::Terminate();
 #endif
 
 #if defined (__FreeBSD__)
     ProcessFreeBSD::Terminate();
 #endif
 
-#if defined(__linux__) || defined(__FreeBSD__)
-    ProcessElfCore::Terminate();
-#endif
     ProcessGDBRemote::Terminate();
     DynamicLoaderStatic::Terminate();
 
