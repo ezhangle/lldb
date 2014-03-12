@@ -296,12 +296,8 @@ IRForTarget::RegisterFunctionMetadata(LLVMContext &context,
                                       llvm::Value *function_ptr, 
                                       const char *name)
 {
-    for (Value::use_iterator i = function_ptr->use_begin(), e = function_ptr->use_end();
-         i != e;
-         ++i)
+    for (llvm::User *user : function_ptr->users())
     {
-        Value *user = *i;
-                
         if (Instruction *user_inst = dyn_cast<Instruction>(user))
         {
             MDString* md_name = MDString::get(context, StringRef(name));
@@ -336,7 +332,7 @@ IRForTarget::ResolveFunctionPointers(llvm::Module &llvm_module)
         if (!is_decl)
             continue;
         
-        if (fun->hasNUses(0))
+        if (fun->use_empty())
             continue; // ignore
         
         uint64_t addr = LLDB_INVALID_ADDRESS;
@@ -363,8 +359,8 @@ IRForTarget::ResolveFunctionPointers(llvm::Module &llvm_module)
         if (fun->hasFnAttribute(llvm::Attribute::NoBuiltin)) {
             llvm::Attribute builtin = llvm::Attribute::get(fun->getContext(), llvm::Attribute::Builtin);
 
-            for (auto u = fun->use_begin(), e = fun->use_end(); u != e; ++u) {
-                if (auto call = dyn_cast<CallInst>(*u)) {
+            for (auto u : fun->users()) {
+                if (auto call = dyn_cast<CallInst>(u)) {
                     call->removeAttribute(AttributeSet::FunctionIndex, builtin);
                 }
             }
@@ -643,7 +639,7 @@ IRForTarget::CreateResultVariable (llvm::Function &llvm_function)
                     PrintValue(result_global).c_str(),
                     PrintValue(new_result_global).c_str());
     
-    if (result_global->hasNUses(0))
+    if (result_global->use_empty())
     {
         // We need to synthesize a store for this variable, because otherwise
         // there's nothing to put into its equivalent persistent variable.
@@ -691,8 +687,7 @@ IRForTarget::CreateResultVariable (llvm::Function &llvm_function)
     return true;
 }
 
-#if 0
-static void DebugUsers(Log *log, Value *value, uint8_t depth)
+static void DebugUsers(lldb_private::Log *log, Value *value, uint8_t depth)
 {    
     if (!depth)
         return;
@@ -702,19 +697,16 @@ static void DebugUsers(Log *log, Value *value, uint8_t depth)
     if (log)
         log->Printf("  <Begin %d users>", value->getNumUses());
     
-    for (Value::use_iterator ui = value->use_begin(), ue = value->use_end();
-         ui != ue;
-         ++ui)
+    for (llvm::User *u : value->users())
     {
         if (log)
-            log->Printf("  <Use %p> %s", *ui, PrintValue(*ui).c_str());
-        DebugUsers(log, *ui, depth);
+            log->Printf("  <Use %p> %s", u, PrintValue(u).c_str());
+        DebugUsers(log, u, depth);
     }
     
     if (log)
         log->Printf("  <End uses>");
 }
-#endif
 
 bool
 IRForTarget::RewriteObjCConstString (llvm::GlobalVariable *ns_str,
@@ -1656,16 +1648,14 @@ IRForTarget::HandleObjCClass(Value *classlist_reference)
     if (class_ptr == LLDB_INVALID_ADDRESS)
         return false;
     
-    if (global_variable->use_begin() == global_variable->use_end())
+    if (global_variable->use_empty())
         return false;
     
     SmallVector<LoadInst *, 2> load_instructions;
         
-    for (Value::use_iterator i = global_variable->use_begin(), e = global_variable->use_end();
-         i != e;
-         ++i)
+    for (llvm::User *u : global_variable->users())
     {
-        if (LoadInst *load_instruction = dyn_cast<LoadInst>(*i))
+        if (LoadInst *load_instruction = dyn_cast<LoadInst>(u))
             load_instructions.push_back(load_instruction);
     }
     
@@ -1761,28 +1751,18 @@ IRForTarget::ResolveExternals (Function &llvm_function)
 {
     lldb_private::Log *log(lldb_private::GetLogIfAllCategoriesSet (LIBLLDB_LOG_EXPRESSIONS));
     
-    for (Module::global_iterator global = m_module->global_begin(), end = m_module->global_end();
-         global != end;
-         ++global)
+    for (GlobalVariable &global_var : m_module->globals())
     {
-        if (!global)
-        {
-            if (m_error_stream)
-                m_error_stream->Printf("Internal error [IRForTarget]: global variable is NULL");
-            
-            return false;
-        }
-        
-        std::string global_name = (*global).getName().str();
+        std::string global_name = global_var.getName().str();
         
         if (log)
             log->Printf("Examining %s, DeclForGlobalValue returns %p", 
                         global_name.c_str(),
-                        DeclForGlobal(global));
+                        DeclForGlobal(&global_var));
         
         if (global_name.find("OBJC_IVAR") == 0)
         {
-            if (!HandleSymbol(global))
+            if (!HandleSymbol(&global_var))
             {
                 if (m_error_stream)
                     m_error_stream->Printf("Error [IRForTarget]: Couldn't find Objective-C indirect ivar symbol %s\n", global_name.c_str());
@@ -1792,7 +1772,7 @@ IRForTarget::ResolveExternals (Function &llvm_function)
         }
         else if (global_name.find("OBJC_CLASSLIST_REFERENCES_$") != global_name.npos)
         {
-            if (!HandleObjCClass(global))
+            if (!HandleObjCClass(&global_var))
             {
                 if (m_error_stream)
                     m_error_stream->Printf("Error [IRForTarget]: Couldn't resolve the class for an Objective-C static method call\n");
@@ -1802,7 +1782,7 @@ IRForTarget::ResolveExternals (Function &llvm_function)
         }
         else if (global_name.find("OBJC_CLASSLIST_SUP_REFS_$") != global_name.npos)
         {
-            if (!HandleObjCClass(global))
+            if (!HandleObjCClass(&global_var))
             {
                 if (m_error_stream)
                     m_error_stream->Printf("Error [IRForTarget]: Couldn't resolve the class for an Objective-C static method call\n");
@@ -1810,9 +1790,9 @@ IRForTarget::ResolveExternals (Function &llvm_function)
                 return false;
             }
         }
-        else if (DeclForGlobal(global))
+        else if (DeclForGlobal(&global_var))
         {
-            if (!MaybeHandleVariable (global))
+            if (!MaybeHandleVariable (&global_var))
             {
                 if (m_error_stream)
                     m_error_stream->Printf("Internal error [IRForTarget]: Couldn't rewrite external variable %s\n", global_name.c_str());
@@ -1834,16 +1814,12 @@ IRForTarget::ReplaceStrings ()
     
     OffsetsTy offsets;
     
-    for (Module::global_iterator gi = m_module->global_begin(), ge = m_module->global_end();
-         gi != ge;
-         ++gi)
+    for (GlobalVariable &gv : m_module->globals())
     {
-        GlobalVariable *gv = gi;
-        
-        if (!gv->hasInitializer())
+        if (!gv.hasInitializer())
             continue;
         
-        Constant *gc = gv->getInitializer();
+        Constant *gc = gv.getInitializer();
         
         std::string str;
         
@@ -1881,7 +1857,7 @@ IRForTarget::ReplaceStrings ()
             str = gc_array->getAsString();
         }
             
-        offsets[gv] = m_data_allocator.GetStream().GetSize();
+        offsets[&gv] = m_data_allocator.GetStream().GetSize();
         
         m_data_allocator.GetStream().Write(str.c_str(), str.length() + 1);
     }
@@ -1900,15 +1876,13 @@ IRForTarget::ReplaceStrings ()
         if (log)
             log->Printf("Replacing GV %s with %s", PrintValue(gv).c_str(), PrintValue(new_initializer).c_str());
         
-        for (GlobalVariable::use_iterator ui = gv->use_begin(), ue = gv->use_end();
-             ui != ue;
-             ++ui)
+        for (llvm::User *u : gv->users())
         {
             if (log)
-                log->Printf("Found use %s", PrintValue(*ui).c_str());
+                log->Printf("Found use %s", PrintValue(u).c_str());
             
-            ConstantExpr *const_expr = dyn_cast<ConstantExpr>(*ui);
-            StoreInst *store_inst = dyn_cast<StoreInst>(*ui);
+            ConstantExpr *const_expr = dyn_cast<ConstantExpr>(u);
+            StoreInst *store_inst = dyn_cast<StoreInst>(u);
             
             if (const_expr)
             {
@@ -1965,12 +1939,8 @@ IRForTarget::ReplaceStaticLiterals (llvm::BasicBlock &basic_block)
     {
         llvm::Instruction &inst = *ii;
         
-        for (Instruction::op_iterator oi = inst.op_begin(), oe = inst.op_end();
-             oi != oe;
-             ++oi)
+        for (Value *operand_val : inst.operand_values())
         {
-            Value *operand_val = oi->get();
-            
             ConstantFP *operand_constant_fp = dyn_cast<ConstantFP>(operand_val);
             
             if (operand_constant_fp/* && operand_constant_fp->getType()->isX86_FP80Ty()*/)
@@ -2091,19 +2061,15 @@ IRForTarget::TurnGuardLoadIntoZero(llvm::Instruction* guard_load)
 {
     Constant* zero(ConstantInt::get(Type::getInt8Ty(m_module->getContext()), 0, true));
 
-    Value::use_iterator ui;
-    
-    for (ui = guard_load->use_begin();
-         ui != guard_load->use_end();
-         ++ui)
+    for (llvm::User *u : guard_load->users())
     {
-        if (isa<Constant>(*ui))
+        if (isa<Constant>(u))
         {
             // do nothing for the moment
         }
         else
         {
-            ui->replaceUsesOfWith(guard_load, zero);
+            u->replaceUsesOfWith(guard_load, zero);
         }
     }
     
@@ -2168,16 +2134,12 @@ IRForTarget::UnfoldConstant(Constant *old_constant,
 {
     lldb_private::Log *log(lldb_private::GetLogIfAllCategoriesSet (LIBLLDB_LOG_EXPRESSIONS));
 
-    Value::use_iterator ui;
-    
     SmallVector<User*, 16> users;
     
     // We do this because the use list might change, invalidating our iterator.
     // Much better to keep a work list ourselves.
-    for (ui = old_constant->use_begin();
-         ui != old_constant->use_end();
-         ++ui)
-        users.push_back(*ui);
+    for (llvm::User *u : old_constant->users())
+        users.push_back(u);
         
     for (size_t i = 0;
          i < users.size();
@@ -2545,37 +2507,29 @@ IRForTarget::StripAllGVs (Module &llvm_module)
     {
         erased = false;
         
-        for (Module::global_iterator gi = llvm_module.global_begin(), ge = llvm_module.global_end();
-             gi != ge;
-             ++gi)
+        for (GlobalVariable &global_var : llvm_module.globals())
         {
-            GlobalVariable *global_var = dyn_cast<GlobalVariable>(gi);
-        
-            global_var->removeDeadConstantUsers();
+            global_var.removeDeadConstantUsers();
             
-            if (global_var->use_empty())
+            if (global_var.use_empty())
             {
                 if (log)
                     log->Printf("Did remove %s",
-                                PrintValue(global_var).c_str());
-                global_var->eraseFromParent();
+                                PrintValue(&global_var).c_str());
+                global_var.eraseFromParent();
                 erased = true;
                 break;
             }
         }
     }
     
-    for (Module::global_iterator gi = llvm_module.global_begin(), ge = llvm_module.global_end();
-         gi != ge;
-         ++gi)
+    for (GlobalVariable &global_var : llvm_module.globals())
     {
-        GlobalVariable *global_var = dyn_cast<GlobalVariable>(gi);
-
-        GlobalValue::use_iterator ui = global_var->use_begin();
+        GlobalValue::user_iterator ui = global_var.user_begin();
         
         if (log)
             log->Printf("Couldn't remove %s because of %s",
-                        PrintValue(global_var).c_str(),
+                        PrintValue(&global_var).c_str(),
                         PrintValue(*ui).c_str());
     }
     

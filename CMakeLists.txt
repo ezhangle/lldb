@@ -20,11 +20,11 @@ if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     "Path to LLVM source code. Not necessary if using an installed LLVM.")
   set(LLDB_PATH_TO_LLVM_BUILD "" CACHE PATH
     "Path to the directory where LLVM was built or installed.")
-    
+
   set(LLDB_PATH_TO_CLANG_SOURCE "" CACHE PATH
     "Path to Clang source code. Not necessary if using an installed Clang.")
   set(LLDB_PATH_TO_CLANG_BUILD "" CACHE PATH
-    "Path to the directory where Clang was built or installed.")    
+    "Path to the directory where Clang was built or installed.")
 
   if (LLDB_PATH_TO_LLVM_SOURCE)
     if (NOT EXISTS "${LLDB_PATH_TO_LLVM_SOURCE}/cmake/config-ix.cmake")
@@ -36,20 +36,20 @@ if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
       list(APPEND CMAKE_MODULE_PATH "${LLVM_MAIN_SRC_DIR}/cmake/modules")
     endif()
   endif()
-  
+
   if (LLDB_PATH_TO_CLANG_SOURCE)
       get_filename_component(CLANG_MAIN_SRC_DIR ${LLDB_PATH_TO_CLANG_SOURCE}
                              ABSOLUTE)
-  endif()  
+  endif()
 
   list(APPEND CMAKE_MODULE_PATH "${LLDB_PATH_TO_LLVM_BUILD}/share/llvm/cmake")
 
   get_filename_component(PATH_TO_LLVM_BUILD ${LLDB_PATH_TO_LLVM_BUILD}
                          ABSOLUTE)
-                         
+
   get_filename_component(PATH_TO_CLANG_BUILD ${LLDB_PATH_TO_CLANG_BUILD}
-                         ABSOLUTE)                         
-                         
+                         ABSOLUTE)
+
   include(AddLLVM)
   include("${LLDB_PATH_TO_LLVM_BUILD}/share/llvm/cmake/LLVMConfig.cmake")
   include(HandleLLVMOptions)
@@ -58,7 +58,7 @@ if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
 
   set(LLVM_MAIN_INCLUDE_DIR "${LLVM_MAIN_SRC_DIR}/include")
   set(LLVM_BINARY_DIR ${CMAKE_BINARY_DIR})
-  
+
   set(CLANG_MAIN_INCLUDE_DIR "${CLANG_MAIN_SRC_DIR}/include")
 
   set(CMAKE_INCLUDE_CURRENT_DIR ON)
@@ -126,19 +126,17 @@ elseif (MSVC_VERSION LESS 1700)
           "required to build lldb.")
 endif()
 
-# Disable Clang warnings
-if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  add_lldb_definitions(
-    -Wno-deprecated-declarations # Suppress "deprecated auto_ptr" warnings
-  )
-endif()
+# Disable GCC warnings
+check_cxx_compiler_flag("-Wno-deprecated-declarations"
+                        CXX_SUPPORTS_NO_DEPRECATED_DECLARATIONS)
+append_if(CXX_SUPPORTS_NO_DEPRECATED_DECLARATIONS
+          "-Wno-deprecated-declarations" CMAKE_CXX_FLAGS)
 
-if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
-    AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER "3.3")
-  add_lldb_definitions(
-    -Wno-deprecated-register # Suppress "deprecated register keyword" warnings
-  )
-endif()
+# Disable Clang warnings
+check_cxx_compiler_flag("-Wno-deprecated-register"
+                        CXX_SUPPORTS_NO_DEPRECATED_REGISTER)
+append_if(CXX_SUPPORTS_NO_DEPRECATED_REGISTER
+          "-Wno-deprecated-register" CMAKE_CXX_FLAGS)
 
 # Disable MSVC warnings
 if( MSVC )
