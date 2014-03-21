@@ -708,27 +708,6 @@ GDBRemoteCommunicationServer::Handle_qSpeedTest (StringExtractorGDBRemote &packe
     return SendErrorResponse (7);
 }
 
-
-static void *
-AcceptPortFromInferior (void *arg)
-{
-    const char *connect_url = (const char *)arg;
-    ConnectionFileDescriptor file_conn;
-    Error error;
-    if (file_conn.Connect (connect_url, &error) == eConnectionStatusSuccess)
-    {
-        char pid_str[256];
-        ::memset (pid_str, 0, sizeof(pid_str));
-        ConnectionStatus status;
-        const size_t pid_str_len = file_conn.Read (pid_str, sizeof(pid_str), 0, status, NULL);
-        if (pid_str_len > 0)
-        {
-            int pid = atoi (pid_str);
-            return (void *)(intptr_t)pid;
-        }
-    }
-    return NULL;
-}
 //
 //static bool
 //WaitForProcessToSIGSTOP (const lldb::pid_t pid, const int timeout_in_seconds)
@@ -977,7 +956,7 @@ GDBRemoteCommunicationServer::Handle_qLaunchGDBServer (StringExtractorGDBRemote 
             {
                 char response[256];
                 const int response_len = ::snprintf (response, sizeof(response), "pid:%" PRIu64 ";port:%u;", debugserver_pid, port + m_port_offset);
-                assert (response_len < sizeof(response));
+                assert (response_len < (int)sizeof(response));
                 PacketResult packet_result = SendPacketNoLock (response, response_len);
 
                 if (packet_result != PacketResult::Success)

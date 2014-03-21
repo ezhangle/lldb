@@ -52,7 +52,7 @@ ReadInt16(const unsigned char* ptr, offset_t offset)
 }
 
 static inline uint32_t
-ReadInt32 (const unsigned char* ptr, offset_t offset)
+ReadInt32 (const unsigned char* ptr, offset_t offset = 0)
 {
     uint32_t value;
     memcpy (&value, ptr + offset, 4);
@@ -60,7 +60,7 @@ ReadInt32 (const unsigned char* ptr, offset_t offset)
 }
 
 static inline uint64_t 
-ReadInt64(const unsigned char* ptr, offset_t offset)
+ReadInt64(const unsigned char* ptr, offset_t offset = 0)
 {
     uint64_t value;
     memcpy (&value, ptr + offset, 8);
@@ -72,22 +72,6 @@ ReadInt16(const void* ptr)
 {
     uint16_t value;
     memcpy (&value, ptr, 2);
-    return value;
-}
-
-static inline uint32_t
-ReadInt32 (const void* ptr)
-{
-    uint32_t value;
-    memcpy (&value, ptr, 4);
-    return value;
-}
-
-static inline uint64_t
-ReadInt64(const void* ptr)
-{
-    uint64_t value;
-    memcpy (&value, ptr, 8);
     return value;
 }
 
@@ -1839,13 +1823,10 @@ DataExtractor::Dump (Stream *s,
                             else if (item_bit_size == ast->getTypeSize(ast->LongDoubleTy))
                             {
                                 llvm::APInt apint;
-                                switch (target_sp->GetArchitecture().GetCore())
+                                switch (target_sp->GetArchitecture().GetMachine())
                                 {
-                                    case ArchSpec::eCore_x86_32_i386:
-                                    case ArchSpec::eCore_x86_32_i486:
-                                    case ArchSpec::eCore_x86_32_i486sx:
-                                    case ArchSpec::eCore_x86_64_x86_64:
-                                    case ArchSpec::eCore_x86_64_x86_64h:
+                                    case llvm::Triple::x86:
+                                    case llvm::Triple::x86_64:
                                         // clang will assert when contructing the apfloat if we use a 16 byte integer value
                                         if (GetAPInt (*this, &offset, 10, apint))
                                         {
