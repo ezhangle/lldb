@@ -137,6 +137,13 @@ ProcessLinux::EnablePluginLogging(Stream *strm, Args &command)
 }
 
 Error
+ProcessLinux::WillDetach()
+{
+  GetTarget().CleanupProcess();
+  return Error();
+}
+
+Error
 ProcessLinux::DoDetach(bool keep_stopped)
 {
     Error error;

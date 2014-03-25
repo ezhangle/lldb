@@ -55,6 +55,9 @@ public:
                  lldb_private::FileSpec *core_file);
 
     virtual lldb_private::Error
+    WillDetach ();
+
+    virtual lldb_private::Error
     DoDetach(bool keep_stopped);
 
     virtual bool
